@@ -368,7 +368,11 @@ export async function start_sandbox(
 
   // add custom flags from SANDBOX_FLAGS
   if (process.env.SANDBOX_FLAGS) {
-    args.push(...process.env.SANDBOX_FLAGS.split(' '));
+    const { parse } = require('shell-quote');
+    const flags = parse(process.env.SANDBOX_FLAGS, process.env).filter(
+      (f:string): f is string => typeof f === 'string'
+    );
+    args.push(...flags);
   }
 
   // add TTY only if stdin is TTY as well, i.e. for piped input don't init TTY in container
