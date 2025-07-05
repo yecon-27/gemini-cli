@@ -1,6 +1,6 @@
 # Gemini CLI: Terms of Service and Privacy Notice
 
-Gemini CLI is an open-source tool that allows you to interact with Google's powerful language models directly from your command-line interface. The terms of service and privacy notices that apply to your usage of Gemini CLI depend on the type of account you use to authenticate with Google.
+Gemini CLI is an open-source tool that lets you interact with Google's powerful language models directly from your command-line interface. The Terms of Service and Privacy notices that apply to your usage of Gemini CLI depend on the type of account you use to authenticate with Google. See [quota and pricing](./quota-and-pricing.md) for details on the quota and pricing details that apply to your usage of Gemini CLI.
 
 This article outlines the specific terms and privacy policies applicable for different auth methods.
 
@@ -10,7 +10,6 @@ For users who authenticate using their Google account to access Gemini Code Assi
 
 - Terms of Service: Your use of Gemini CLI is governed by the general [Google Terms of Service](https://policies.google.com/terms?hl=en-US).
 - Privacy Notice: The collection and use of your data are described in the [Gemini Code Assist Privacy Notice for Individuals](https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals).
-- Usage Statistics Opt-Out: You may opt-out from Usage Statistics data by following the instructions available here: Usage Statistics Configuration.
 
 ## 2. Gemini API Key (Using Gemini Developer [API](https://ai.google.dev/gemini-api/docs) a: Unpaid Service, b: Paid Service)
 
@@ -21,7 +20,7 @@ If you are using a Gemini API key for authentication, the following terms apply:
 
 ## 3. Login with Google (for Workspace or Licensed Code Assist users)
 
-For users of Standard or Enterprise [edition](https://cloud.google.com/gemini/docs/codeassist/overview#editions-overview) of Gemini Code Assist :
+For users of Standard or Enterprise [edition](https://cloud.google.com/gemini/docs/codeassist/overview#editions-overview) of Gemini Code Assist:
 
 - Terms of Service: The [Google Cloud Platform Terms of Service](https://cloud.google.com/terms) govern your use of the service.
 - Privacy Notice: The handling of your data is outlined in the [Gemini Code Assist Privacy Notices](https://developers.google.com/gemini-code-assist/resources/privacy-notices).
@@ -44,7 +43,7 @@ You may opt-out from sending Usage Statistics to Google data by following the in
 This depends entirely on the type of auth method you use.
 
 - **Auth method 1:** Yes. When you use your personal Google account, the Gemini Code Assist Privacy Notice for Individuals applies. Under this notice, your **prompts, answers, and related code are collected** and may be used to improve Google's products, which includes model training.
-- **Auth method 2a:** Yes, When you use the Gemini API key Gemini API (Unpaid Service) terms apply. Under this notice , your **prompts, answers, and related code are collected** and may be used to improve Google's products, which includes model training.
+- **Auth method 2a:** Yes. When you use the Gemini API key Gemini API (Unpaid Service) terms apply. Under this notice , your **prompts, answers, and related code are collected** and may be used to improve Google's products, which includes model training.
 - **Auth method 2b, 3 & 4:** No. For these accounts, your data is governed by the Google Cloud or Gemini API (Paid Service) terms, which treat your inputs as confidential. Your code, prompts, and other inputs are **not** used to train models.
 
 ### 2. What are "Usage Statistics" and what does the opt-out control?

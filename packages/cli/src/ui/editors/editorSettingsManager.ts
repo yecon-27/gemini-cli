@@ -19,10 +19,12 @@ export interface EditorDisplay {
 export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   zed: 'Zed',
   vscode: 'VS Code',
+  vscodium: 'VSCodium',
   windsurf: 'Windsurf',
   cursor: 'Cursor',
   vim: 'Vim',
   emacs: 'Emacs',
+  neovim: 'Neovim',
 };
 
 class EditorSettingsManager {
@@ -32,9 +34,11 @@ class EditorSettingsManager {
     const editorTypes: EditorType[] = [
       'zed',
       'vscode',
+      'vscodium',
       'windsurf',
       'cursor',
       'vim',
+      'neovim',
     ];
     this.availableEditors = [
       {
