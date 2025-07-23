@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { CommandKind, OpenDialogActionReturn, SlashCommand } from './types.js';
 
 export const settingsCommand: SlashCommand = {
@@ -8,4 +13,4 @@ export const settingsCommand: SlashCommand = {
     type: 'dialog',
     dialog: 'settings',
   }),
-}; 
+};

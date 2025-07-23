@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { useState, useCallback } from 'react';
 
 export function useSettingsCommand() {
@@ -16,4 +21,4 @@ export function useSettingsCommand() {
     openSettingsDialog,
     closeSettingsDialog,
   };
-} 
+}

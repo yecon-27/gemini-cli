@@ -372,11 +372,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     config.setFlashFallbackHandler(flashFallbackHandler);
   }, [config, addItem, userTier]);
 
-  const {
-    isSettingsDialogOpen,
-    openSettingsDialog,
-    closeSettingsDialog,
-  } = useSettingsCommand();
+  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
+    useSettingsCommand();
 
   const {
     handleSlashCommand,
@@ -862,7 +859,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                    config.getAccessibility()?.disableLoadingPhrases
+                  config.getAccessibility()?.disableLoadingPhrases
                     ? undefined
                     : thought
                 }

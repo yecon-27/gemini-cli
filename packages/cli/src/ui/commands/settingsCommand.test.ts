@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { settingsCommand } from './settingsCommand.js';
 import { type CommandContext } from './types.js';
@@ -23,6 +28,8 @@ describe('settingsCommand', () => {
 
   it('should have the correct name and description', () => {
     expect(settingsCommand.name).toBe('settings');
-    expect(settingsCommand.description).toBe('View and edit Gemini CLI settings');
+    expect(settingsCommand.description).toBe(
+      'View and edit Gemini CLI settings',
+    );
   });
-}); 
+});
