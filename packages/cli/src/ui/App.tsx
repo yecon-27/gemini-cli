@@ -783,7 +783,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
           {isSettingsDialogOpen ? (
             <Box flexDirection="column">
-              <SettingsDialog settings={settings} onSelect={() => closeSettingsDialog()} />
+              <SettingsDialog
+                settings={settings}
+                onSelect={() => closeSettingsDialog()}
+                onRestartRequest={() => process.exit(0)}
+              />
             </Box>
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">

@@ -16,6 +16,7 @@ import process from 'node:process';
 interface SettingsDialogProps {
     settings: LoadedSettings;
     onSelect: (settingName: string | undefined, scope: SettingScope) => void;
+    onRestartRequest?: () => void;
 }
 
 interface AccessibilitySettings {
@@ -41,6 +42,7 @@ const maxItemsToShow = 8;
 export default function SettingsDialog({
     settings,
     onSelect,
+    onRestartRequest,
 }: SettingsDialogProps): React.JSX.Element {
     // Focus state: 'settings' or 'scope'
     const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
@@ -81,8 +83,11 @@ export default function SettingsDialog({
         parentKey: keyof Settings,
         nestedKey: string,
     ): boolean | undefined {
-        const parent = settings.forScope(selectedScope).settings[parentKey] as any;
-        return parent ? (parent[nestedKey] as boolean | undefined) : undefined;
+        const parent = settings.forScope(selectedScope).settings[parentKey];
+        if (parent && typeof parent === 'object' && !Array.isArray(parent)) {
+            return (parent as Record<string, boolean | undefined>)[nestedKey];
+        }
+        return undefined;
     }
 
     // Update helpers (with ts-ignore for now)
@@ -337,7 +342,7 @@ export default function SettingsDialog({
             }
         }
         if (showRestartPrompt && input === 'r') {
-            process.exit(0);
+            if (onRestartRequest) onRestartRequest();
         }
         if (key.escape) {
             onSelect(undefined, selectedScope);
