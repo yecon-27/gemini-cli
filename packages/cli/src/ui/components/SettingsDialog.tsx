@@ -15,7 +15,7 @@ import process from 'node:process';
 
 interface SettingsDialogProps {
     settings: LoadedSettings;
-    onExit?: () => void;
+    onSelect: (settingName: string | undefined, scope: SettingScope) => void;
 }
 
 interface AccessibilitySettings {
@@ -40,10 +40,8 @@ const maxItemsToShow = 8;
 
 export default function SettingsDialog({
     settings,
-    onExit,
+    onSelect,
 }: SettingsDialogProps): React.JSX.Element {
-    // Provide a default no-op for onExit
-    onExit = onExit || (() => { });
     // Focus state: 'settings' or 'scope'
     const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
         'settings',
@@ -342,7 +340,7 @@ export default function SettingsDialog({
             process.exit(0);
         }
         if (key.escape) {
-            if (onExit) onExit();
+            onSelect(undefined, selectedScope);
         }
     });
 

@@ -783,7 +783,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
           {isSettingsDialogOpen ? (
             <Box flexDirection="column">
-              <SettingsDialog settings={settings} />
+              <SettingsDialog settings={settings} onSelect={() => closeSettingsDialog()} />
             </Box>
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
@@ -859,7 +859,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
               <LoadingIndicator
                 thought={
                   streamingState === StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.disableLoadingPhrases
+                    config.getAccessibility()?.disableLoadingPhrases
                     ? undefined
                     : thought
                 }
