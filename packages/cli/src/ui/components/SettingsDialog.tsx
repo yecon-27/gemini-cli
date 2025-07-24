@@ -312,9 +312,9 @@ export function SettingsDialog({
         setFocusSection('scope');
       }
     } else if (focusSection === 'scope') {
-      if (key.upArrow || input === 'k') {
+      if (key.leftArrow || input === 'h') {
         if (activeScopeIndex > 0) setActiveScopeIndex(activeScopeIndex - 1);
-      } else if (key.downArrow || input === 'j') {
+      } else if (key.rightArrow || input === 'l') {
         if (activeScopeIndex < scopeItems.length - 1)
           setActiveScopeIndex(activeScopeIndex + 1);
       } else if (key.return || input === ' ') {
@@ -339,68 +339,99 @@ export function SettingsDialog({
       flexDirection="column"
       padding={1}
       width="100%"
+      height="100%"
     >
-      <Text bold color={Colors.AccentBlue}>
-        Settings
-      </Text>
-      <Box height={1} />
-      {showScrollUp && <Text color={Colors.Gray}>▲</Text>}
-      {visibleItems.map((item, idx) => {
-        const isActive =
-          focusSection === 'settings' &&
-          activeSettingIndex === idx + scrollOffset;
-        return (
-          <React.Fragment key={item.value}>
-            <Box flexDirection="row" alignItems="center">
-              <Box minWidth={2} flexShrink={0}>
-                <Text color={isActive ? Colors.AccentGreen : Colors.Gray}>
-                  {isActive ? '●' : ''}
-                </Text>
-              </Box>
-              <Box minWidth={50}>
-                <Text color={isActive ? Colors.AccentGreen : Colors.Foreground}>
-                  {item.label}
-                </Text>
-              </Box>
-              <Box minWidth={3} />
-              <Text color={isActive ? Colors.AccentGreen : Colors.Gray}>
-                {String(item.checked)}
-              </Text>
-            </Box>
-            <Box height={1} />
-          </React.Fragment>
-        );
-      })}
-      {showScrollDown && <Text color={Colors.Gray}>▼</Text>}
-      <Box height={1} />
-      <Text bold color={Colors.AccentBlue}>
-        Apply To
-      </Text>
-      {scopeItems.map((item, idx) => {
-        const isActive = focusSection === 'scope' && activeScopeIndex === idx;
-        const isSelected = selectedScope === item.value;
-        return (
-          <Box key={item.value} flexDirection="row" alignItems="center">
-            <Box minWidth={2} flexShrink={0}>
-              <Text color={Colors.AccentGreen}>{isSelected ? '●' : ''}</Text>
-            </Box>
-            <Text color={isActive ? Colors.AccentGreen : Colors.Foreground}>
-              {item.label}
-            </Text>
-            <Box flexGrow={1} />
-            {/* No checkmark for scope selector */}
-          </Box>
-        );
-      })}
-      <Box height={1} />
-      <Text color={Colors.Gray}>
-        (Use Enter to select, Tab to change focus)
-      </Text>
-      {showRestartPrompt && (
-        <Text color={Colors.AccentYellow}>
-          To see changes, Gemini CLI must be restarted. Press r to restart now.
+      {/* Settings List */}
+      <Box flexDirection="column" flexGrow={1}>
+        <Text bold color={Colors.AccentBlue}>
+          Settings
         </Text>
-      )}
+        <Box height={1} />
+        {showScrollUp && <Text color={Colors.Gray}>▲</Text>}
+        {visibleItems.map((item, idx) => {
+          const isActive =
+            focusSection === 'settings' &&
+            activeSettingIndex === idx + scrollOffset;
+          return (
+            <React.Fragment key={item.value}>
+              <Box flexDirection="row" alignItems="center">
+                <Box minWidth={2} flexShrink={0}>
+                  <Text color={isActive ? Colors.AccentGreen : Colors.Gray}>
+                    {isActive ? '●' : ''}
+                  </Text>
+                </Box>
+                <Box minWidth={50}>
+                  <Text
+                    color={isActive ? Colors.AccentGreen : Colors.Foreground}
+                  >
+                    {item.label}
+                  </Text>
+                </Box>
+                <Box minWidth={3} />
+                <Text color={isActive ? Colors.AccentGreen : Colors.Gray}>
+                  {String(item.checked)}
+                </Text>
+              </Box>
+              <Box height={1} />
+            </React.Fragment>
+          );
+        })}
+        {showScrollDown && <Text color={Colors.Gray}>▼</Text>}
+
+        <Box height={1} />
+
+        {/* Bottom row with instructions on left and Apply To on right */}
+        <Box
+          flexDirection="row"
+          justifyContent="space-between"
+          alignItems="flex-end"
+        >
+          <Box flexDirection="column">
+            <Text color={Colors.Gray}>
+              (Use Enter to select, Tab to change focus)
+            </Text>
+            {showRestartPrompt && (
+              <Text color={Colors.AccentYellow}>
+                To see changes, Gemini CLI must be restarted. Press r to restart
+                now.
+              </Text>
+            )}
+          </Box>
+
+          {/* Apply To Section - Right bottom */}
+          <Box flexDirection="row" alignItems="center" gap={2}>
+            <Text color={Colors.AccentBlue}>Apply To</Text>
+
+            {/* Display scope items horizontally */}
+            <Box flexDirection="row" gap={2} flexWrap="wrap">
+              {scopeItems.map((item, idx) => {
+                const isActive =
+                  focusSection === 'scope' && activeScopeIndex === idx;
+                const isSelected = selectedScope === item.value;
+                return (
+                  <Box
+                    key={item.value}
+                    flexDirection="row"
+                    alignItems="center"
+                    marginRight={1}
+                  >
+                    <Box minWidth={2} flexShrink={0}>
+                      <Text color={Colors.AccentGreen}>
+                        {isSelected ? '●' : ''}
+                      </Text>
+                    </Box>
+                    <Text
+                      color={isActive ? Colors.AccentGreen : Colors.Foreground}
+                    >
+                      {item.label}
+                    </Text>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+        </Box>
+      </Box>
     </Box>
   );
 }
