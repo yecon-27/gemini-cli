@@ -148,6 +148,15 @@ export class LoopDetectionService {
     return false;
   }
 
+  /**
+   * Detects content loops by analyzing streaming text for repetitive patterns.
+   * 
+   * The algorithm works by:
+   * 1. Appending new content to the streaming history
+   * 2. Truncating history if it exceeds the maximum length
+   * 3. Analyzing content chunks for repetitive patterns using hashing
+   * 4. Detecting loops when identical chunks appear frequently within a short distance
+   */
   private checkContentLoop(content: string): boolean {
     this.streamContentHistory += content;
 
@@ -155,11 +164,16 @@ export class LoopDetectionService {
     return this.analyzeContentChunksForLoop();
   }
 
+  /**
+   * Truncates the content history to prevent unbounded memory growth.
+   * When truncating, adjusts all stored indices to maintain their relative positions.
+   */
   private truncateAndUpdate(): void {
     if (this.streamContentHistory.length <= MAX_HISTORY_LENGTH) {
       return;
     }
 
+    // Calculate how much content to remove from the beginning
     const truncationAmount =
       this.streamContentHistory.length - MAX_HISTORY_LENGTH;
     this.streamContentHistory =
@@ -169,6 +183,7 @@ export class LoopDetectionService {
       this.lastContentIndex - truncationAmount,
     );
 
+    // Update all stored chunk indices to account for the truncation
     for (const [hash, oldIndices] of this.contentStats.entries()) {
       const adjustedIndices = oldIndices
         .map((index) => index - truncationAmount)
@@ -182,8 +197,18 @@ export class LoopDetectionService {
     }
   }
 
+  /**
+   * Analyzes content in fixed-size chunks to detect repetitive patterns.
+   * 
+   * Uses a sliding window approach:
+   * 1. Extract chunks of fixed size (CONTENT_CHUNK_SIZE)
+   * 2. Hash each chunk for efficient comparison
+   * 3. Track positions where identical chunks appear
+   * 4. Detect loops when chunks repeat frequently within a short distance
+   */
   private analyzeContentChunksForLoop(): boolean {
     while (this.hasMoreChunksToProcess()) {
+      // Extract current chunk of text
       const currentChunk = this.streamContentHistory.substring(
         this.lastContentIndex,
         this.lastContentIndex + CONTENT_CHUNK_SIZE,
@@ -201,6 +226,7 @@ export class LoopDetectionService {
         return true;
       }
 
+      // Move to next position in the sliding window
       this.lastContentIndex++;
     }
 
@@ -214,6 +240,16 @@ export class LoopDetectionService {
     );
   }
 
+  /**
+   * Determines if a content chunk indicates a loop pattern.
+   * 
+   * Loop detection logic:
+   * 1. Check if we've seen this hash before (new chunks are stored for future comparison)
+   * 2. Verify actual content matches to prevent hash collisions
+   * 3. Track all positions where this chunk appears
+   * 4. A loop is detected when the same chunk appears CONTENT_LOOP_THRESHOLD times
+   *    within a small average distance (≤ 1.5 * chunk size)
+   */
   private isLoopDetectedForChunk(chunk: string, hash: string): boolean {
     const existingIndices = this.contentStats.get(hash);
 
@@ -232,6 +268,7 @@ export class LoopDetectionService {
       return false;
     }
 
+    // Analyze the most recent occurrences to see if they're clustered closely together
     const recentIndices = existingIndices.slice(-CONTENT_LOOP_THRESHOLD);
     const totalDistance =
       recentIndices[recentIndices.length - 1] - recentIndices[0];
@@ -241,6 +278,10 @@ export class LoopDetectionService {
     return averageDistance <= maxAllowedDistance;
   }
 
+  /**
+   * Verifies that two chunks with the same hash actually contain identical content.
+   * This prevents false positives from hash collisions.
+   */
   private isActualContentMatch(
     currentChunk: string,
     originalIndex: number,
