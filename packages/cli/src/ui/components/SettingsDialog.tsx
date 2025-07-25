@@ -336,7 +336,7 @@ export function SettingsDialog({
     <Box
       borderStyle="round"
       borderColor={Colors.Gray}
-      flexDirection="column"
+      flexDirection="row"
       padding={1}
       width="100%"
       height="100%"
@@ -361,9 +361,7 @@ export function SettingsDialog({
                   </Text>
                 </Box>
                 <Box minWidth={50}>
-                  <Text
-                    color={isActive ? Colors.AccentGreen : Colors.Foreground}
-                  >
+                  <Text color={isActive ? Colors.AccentGreen : Colors.Foreground}>
                     {item.label}
                   </Text>
                 </Box>
@@ -380,57 +378,39 @@ export function SettingsDialog({
 
         <Box height={1} />
 
-        {/* Bottom row with instructions on left and Apply To on right */}
-        <Box
-          flexDirection="row"
-          justifyContent="space-between"
-          alignItems="flex-end"
-        >
-          <Box flexDirection="column">
-            <Text color={Colors.Gray}>
-              (Use Enter to select, Tab to change focus)
-            </Text>
-            {showRestartPrompt && (
-              <Text color={Colors.AccentYellow}>
-                To see changes, Gemini CLI must be restarted. Press r to restart
-                now.
-              </Text>
-            )}
-          </Box>
+        {/* Apply To Section - Moved to bottom */}
+        <Text color={Colors.AccentBlue}>
+          Apply To
+        </Text>
+        <Box height={1} />
 
-          {/* Apply To Section - Right bottom */}
-          <Box flexDirection="row" alignItems="center" gap={2}>
-            <Text color={Colors.AccentBlue}>Apply To</Text>
-
-            {/* Display scope items horizontally */}
-            <Box flexDirection="row" gap={2} flexWrap="wrap">
-              {scopeItems.map((item, idx) => {
-                const isActive =
-                  focusSection === 'scope' && activeScopeIndex === idx;
-                const isSelected = selectedScope === item.value;
-                return (
-                  <Box
-                    key={item.value}
-                    flexDirection="row"
-                    alignItems="center"
-                    marginRight={1}
-                  >
-                    <Box minWidth={2} flexShrink={0}>
-                      <Text color={Colors.AccentGreen}>
-                        {isSelected ? '●' : ''}
-                      </Text>
-                    </Box>
-                    <Text
-                      color={isActive ? Colors.AccentGreen : Colors.Foreground}
-                    >
-                      {item.label}
-                    </Text>
-                  </Box>
-                );
-              })}
-            </Box>
-          </Box>
+        {/* Display scope items vertically */}
+        <Box flexDirection="column">
+          {scopeItems.map((item, idx) => {
+            const isActive = focusSection === 'scope' && activeScopeIndex === idx;
+            const isSelected = selectedScope === item.value;
+            return (
+              <Box key={item.value} flexDirection="row" alignItems="center">
+                <Box minWidth={2} flexShrink={0}>
+                  <Text color={Colors.AccentGreen}>{isSelected ? '●' : ''}</Text>
+                </Box>
+                <Text color={isActive ? Colors.AccentGreen : Colors.Foreground}>
+                  {item.label}
+                </Text>
+              </Box>
+            );
+          })}
         </Box>
+
+        <Box height={1} />
+        <Text color={Colors.Gray}>
+          (Use Enter to select, Tab to change focus)
+        </Text>
+        {showRestartPrompt && (
+          <Text color={Colors.AccentYellow}>
+            To see changes, Gemini CLI must be restarted. Press r to restart now.
+          </Text>
+        )}
       </Box>
     </Box>
   );
