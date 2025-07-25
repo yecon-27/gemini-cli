@@ -45,9 +45,13 @@ export function SettingsDialog({
   onRestartRequest,
 }: SettingsDialogProps): React.JSX.Element {
   // Focus state: 'settings' or 'scope'
-  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>('settings');
+  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
+    'settings',
+  );
   // Scope selector state (User by default)
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(SettingScope.User);
+  const [selectedScope, setSelectedScope] = useState<SettingScope>(
+    SettingScope.User,
+  );
   // Active indices
   const [activeSettingIndex, setActiveSettingIndex] = useState(0);
   const [activeScopeIndex, setActiveScopeIndex] = useState(0);
@@ -58,17 +62,21 @@ export function SettingsDialog({
   // Local pending settings state for the selected scope
   const [pendingSettings, setPendingSettings] = useState<Settings>(() => {
     // Deep clone to avoid mutation
-    return JSON.parse(JSON.stringify(settings.forScope(selectedScope).settings));
+    return JSON.parse(
+      JSON.stringify(settings.forScope(selectedScope).settings),
+    );
   });
 
   // Reset pending settings when scope changes
   useEffect(() => {
-    setPendingSettings(JSON.parse(JSON.stringify(settings.forScope(selectedScope).settings)));
+    setPendingSettings(
+      JSON.parse(JSON.stringify(settings.forScope(selectedScope).settings)),
+    );
   }, [selectedScope, settings]);
 
   // Helper to get value for a given scope (from pendingSettings)
   const getScopedValue = (key: keyof Settings): boolean | undefined =>
-    (pendingSettings[key] as boolean | undefined);
+    pendingSettings[key] as boolean | undefined;
   function getScopedNestedValue(
     parentKey: 'accessibility',
     nestedKey: keyof AccessibilitySettings,
@@ -97,7 +105,7 @@ export function SettingsDialog({
     key: keyof AccessibilitySettings,
     value: boolean,
   ) => {
-    setPendingSettings(prev => ({
+    setPendingSettings((prev) => ({
       ...prev,
       accessibility: { ...(prev.accessibility || {}), [key]: value },
     }));
@@ -107,7 +115,7 @@ export function SettingsDialog({
     key: keyof CheckpointingSettings,
     value: boolean,
   ) => {
-    setPendingSettings(prev => ({
+    setPendingSettings((prev) => ({
       ...prev,
       checkpointing: { ...(prev.checkpointing || {}), [key]: value },
     }));
@@ -117,7 +125,7 @@ export function SettingsDialog({
     key: keyof FileFilteringSettings,
     value: boolean,
   ) => {
-    setPendingSettings(prev => ({
+    setPendingSettings((prev) => ({
       ...prev,
       fileFiltering: { ...(prev.fileFiltering || {}), [key]: value },
     }));
@@ -127,7 +135,7 @@ export function SettingsDialog({
     key: K,
     value: Settings[K],
   ) => {
-    setPendingSettings(prev => ({ ...prev, [key]: value }));
+    setPendingSettings((prev) => ({ ...prev, [key]: value }));
     setShowRestartPrompt(true);
   };
 
@@ -314,7 +322,8 @@ export function SettingsDialog({
       if (key.upArrow || input === 'k') {
         if (activeScopeIndex > 0) setActiveScopeIndex(activeScopeIndex - 1);
       } else if (key.downArrow || input === 'j') {
-        if (activeScopeIndex < scopeItems.length - 1) setActiveScopeIndex(activeScopeIndex + 1);
+        if (activeScopeIndex < scopeItems.length - 1)
+          setActiveScopeIndex(activeScopeIndex + 1);
       } else if (key.return || input === ' ') {
         setSelectedScope(scopeItems[activeScopeIndex].value);
         setFocusSection('settings');
@@ -369,7 +378,9 @@ export function SettingsDialog({
                   </Text>
                 </Box>
                 <Box minWidth={50}>
-                  <Text color={isActive ? Colors.AccentGreen : Colors.Foreground}>
+                  <Text
+                    color={isActive ? Colors.AccentGreen : Colors.Foreground}
+                  >
                     {item.label}
                   </Text>
                 </Box>
@@ -387,20 +398,21 @@ export function SettingsDialog({
         <Box height={1} />
 
         {/* Apply To Section - Moved to bottom */}
-        <Text color={Colors.AccentBlue}>
-          Apply To
-        </Text>
+        <Text color={Colors.AccentBlue}>Apply To</Text>
         <Box height={1} />
 
         {/* Display scope items vertically */}
         <Box flexDirection="column">
           {scopeItems.map((item, idx) => {
-            const isActive = focusSection === 'scope' && activeScopeIndex === idx;
+            const isActive =
+              focusSection === 'scope' && activeScopeIndex === idx;
             const isSelected = selectedScope === item.value;
             return (
               <Box key={item.value} flexDirection="row" alignItems="center">
                 <Box minWidth={2} flexShrink={0}>
-                  <Text color={Colors.AccentGreen}>{isSelected ? '●' : ''}</Text>
+                  <Text color={Colors.AccentGreen}>
+                    {isSelected ? '●' : ''}
+                  </Text>
                 </Box>
                 <Text color={isActive ? Colors.AccentGreen : Colors.Foreground}>
                   {item.label}
@@ -416,7 +428,8 @@ export function SettingsDialog({
         </Text>
         {showRestartPrompt && (
           <Text color={Colors.AccentYellow}>
-            To see changes, Gemini CLI must be restarted. Press r to restart now.
+            To see changes, Gemini CLI must be restarted. Press r to restart
+            now.
           </Text>
         )}
       </Box>
