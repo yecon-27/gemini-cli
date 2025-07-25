@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { Colors } from '../colors.js';
 import {
@@ -45,13 +45,9 @@ export function SettingsDialog({
   onRestartRequest,
 }: SettingsDialogProps): React.JSX.Element {
   // Focus state: 'settings' or 'scope'
-  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
-    'settings',
-  );
+  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>('settings');
   // Scope selector state (User by default)
-  const [selectedScope, setSelectedScope] = useState<SettingScope>(
-    SettingScope.User,
-  );
+  const [selectedScope, setSelectedScope] = useState<SettingScope>(SettingScope.User);
   // Active indices
   const [activeSettingIndex, setActiveSettingIndex] = useState(0);
   const [activeScopeIndex, setActiveScopeIndex] = useState(0);
@@ -59,9 +55,20 @@ export function SettingsDialog({
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
 
-  // Helper to get value for a given scope
+  // Local pending settings state for the selected scope
+  const [pendingSettings, setPendingSettings] = useState<Settings>(() => {
+    // Deep clone to avoid mutation
+    return JSON.parse(JSON.stringify(settings.forScope(selectedScope).settings));
+  });
+
+  // Reset pending settings when scope changes
+  useEffect(() => {
+    setPendingSettings(JSON.parse(JSON.stringify(settings.forScope(selectedScope).settings)));
+  }, [selectedScope, settings]);
+
+  // Helper to get value for a given scope (from pendingSettings)
   const getScopedValue = (key: keyof Settings): boolean | undefined =>
-    settings.forScope(selectedScope).settings[key] as boolean | undefined;
+    (pendingSettings[key] as boolean | undefined);
   function getScopedNestedValue(
     parentKey: 'accessibility',
     nestedKey: keyof AccessibilitySettings,
@@ -78,46 +85,50 @@ export function SettingsDialog({
     parentKey: keyof Settings,
     nestedKey: string,
   ): boolean | undefined {
-    const parent = settings.forScope(selectedScope).settings[parentKey];
+    const parent = pendingSettings[parentKey];
     if (parent && typeof parent === 'object' && !Array.isArray(parent)) {
       return (parent as Record<string, boolean | undefined>)[nestedKey];
     }
     return undefined;
   }
 
-  // Update helpers (with ts-ignore for now)
+  // Update helpers (update local pendingSettings only)
   const updateAccessibility = (
     key: keyof AccessibilitySettings,
     value: boolean,
   ) => {
-    const parent = (settings.forScope(selectedScope).settings.accessibility ||
-      {}) as AccessibilitySettings;
-    const updated = { ...parent, [key]: value };
-    settings.setValue(selectedScope, 'accessibility', updated);
+    setPendingSettings(prev => ({
+      ...prev,
+      accessibility: { ...(prev.accessibility || {}), [key]: value },
+    }));
+    setShowRestartPrompt(true);
   };
   const updateCheckpointing = (
     key: keyof CheckpointingSettings,
     value: boolean,
   ) => {
-    const parent = (settings.forScope(selectedScope).settings.checkpointing ||
-      {}) as CheckpointingSettings;
-    const updated = { ...parent, [key]: value };
-    settings.setValue(selectedScope, 'checkpointing', updated);
+    setPendingSettings(prev => ({
+      ...prev,
+      checkpointing: { ...(prev.checkpointing || {}), [key]: value },
+    }));
+    setShowRestartPrompt(true);
   };
   const updateFileFiltering = (
     key: keyof FileFilteringSettings,
     value: boolean,
   ) => {
-    const parent = (settings.forScope(selectedScope).settings.fileFiltering ||
-      {}) as FileFilteringSettings;
-    const updated = { ...parent, [key]: value };
-    settings.setValue(selectedScope, 'fileFiltering', updated);
+    setPendingSettings(prev => ({
+      ...prev,
+      fileFiltering: { ...(prev.fileFiltering || {}), [key]: value },
+    }));
+    setShowRestartPrompt(true);
   };
   const updateSetting = <K extends keyof Settings>(
     key: K,
     value: Settings[K],
   ) => {
-    settings.setValue(selectedScope, key, value);
+    setPendingSettings(prev => ({ ...prev, [key]: value }));
+    setShowRestartPrompt(true);
   };
 
   // List of boolean settings (with default false if undefined)
@@ -131,7 +142,6 @@ export function SettingsDialog({
           'showMemoryUsage',
           !(getScopedValue('showMemoryUsage') ?? false),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -147,7 +157,6 @@ export function SettingsDialog({
             false
           ),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -159,7 +168,6 @@ export function SettingsDialog({
           'usageStatisticsEnabled',
           !(getScopedValue('usageStatisticsEnabled') ?? false),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -171,7 +179,6 @@ export function SettingsDialog({
           'enabled',
           !(getScopedNestedValue('checkpointing', 'enabled') ?? false),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -183,7 +190,6 @@ export function SettingsDialog({
           'autoConfigureMaxOldSpaceSize',
           !(getScopedValue('autoConfigureMaxOldSpaceSize') ?? false),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -196,7 +202,6 @@ export function SettingsDialog({
           'respectGitIgnore',
           !(getScopedNestedValue('fileFiltering', 'respectGitIgnore') ?? false),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -212,7 +217,6 @@ export function SettingsDialog({
             false
           ),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -231,7 +235,6 @@ export function SettingsDialog({
             ) ?? false
           ),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -243,7 +246,6 @@ export function SettingsDialog({
           'hideWindowTitle',
           !(getScopedValue('hideWindowTitle') ?? false),
         );
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -252,7 +254,6 @@ export function SettingsDialog({
       checked: getScopedValue('hideTips') ?? false,
       toggle: () => {
         updateSetting('hideTips', !(getScopedValue('hideTips') ?? false));
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -261,7 +262,6 @@ export function SettingsDialog({
       checked: getScopedValue('hideBanner') ?? false,
       toggle: () => {
         updateSetting('hideBanner', !(getScopedValue('hideBanner') ?? false));
-        setShowRestartPrompt(true);
       },
     },
     {
@@ -270,7 +270,6 @@ export function SettingsDialog({
       checked: getScopedValue('ideMode') ?? false,
       toggle: () => {
         updateSetting('ideMode', !(getScopedValue('ideMode') ?? false));
-        setShowRestartPrompt(true);
       },
     },
   ];
@@ -312,19 +311,28 @@ export function SettingsDialog({
         setFocusSection('scope');
       }
     } else if (focusSection === 'scope') {
-      if (key.leftArrow || input === 'h') {
+      if (key.upArrow || input === 'k') {
         if (activeScopeIndex > 0) setActiveScopeIndex(activeScopeIndex - 1);
-      } else if (key.rightArrow || input === 'l') {
-        if (activeScopeIndex < scopeItems.length - 1)
-          setActiveScopeIndex(activeScopeIndex + 1);
+      } else if (key.downArrow || input === 'j') {
+        if (activeScopeIndex < scopeItems.length - 1) setActiveScopeIndex(activeScopeIndex + 1);
       } else if (key.return || input === ' ') {
         setSelectedScope(scopeItems[activeScopeIndex].value);
         setFocusSection('settings');
+        setActiveSettingIndex(0);
+        setScrollOffset(0);
       } else if (key.tab) {
         setFocusSection('settings');
       }
     }
     if (showRestartPrompt && input === 'r') {
+      // Commit all pending changes to real settings
+      const scope = selectedScope;
+      const pending = pendingSettings;
+      // For each key in pending, set value in settings
+      Object.entries(pending).forEach(([key, value]) => {
+        settings.setValue(scope, key as keyof Settings, value);
+      });
+      setShowRestartPrompt(false);
       if (onRestartRequest) onRestartRequest();
     }
     if (key.escape) {
