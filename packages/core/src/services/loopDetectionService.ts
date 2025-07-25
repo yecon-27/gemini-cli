@@ -150,7 +150,7 @@ export class LoopDetectionService {
 
   /**
    * Detects content loops by analyzing streaming text for repetitive patterns.
-   * 
+   *
    * The algorithm works by:
    * 1. Appending new content to the streaming history
    * 2. Truncating history if it exceeds the maximum length
@@ -199,7 +199,7 @@ export class LoopDetectionService {
 
   /**
    * Analyzes content in fixed-size chunks to detect repetitive patterns.
-   * 
+   *
    * Uses a sliding window approach:
    * 1. Extract chunks of fixed size (CONTENT_CHUNK_SIZE)
    * 2. Hash each chunk for efficient comparison
@@ -242,7 +242,7 @@ export class LoopDetectionService {
 
   /**
    * Determines if a content chunk indicates a loop pattern.
-   * 
+   *
    * Loop detection logic:
    * 1. Check if we've seen this hash before (new chunks are stored for future comparison)
    * 2. Verify actual content matches to prevent hash collisions
