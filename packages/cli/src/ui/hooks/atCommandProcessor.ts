@@ -303,6 +303,7 @@ export async function handleAtCommand({
         pathSpecsToRead.push(currentPathSpec);
         atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
         contentLabelsForDisplay.push(pathName);
+        break;
       }
     }
   }

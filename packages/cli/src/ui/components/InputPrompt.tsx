@@ -63,9 +63,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
   );
-  if (dirs.length !== config.getWorkspaceContext().getDirectories().length) {
-    setDirs(config.getWorkspaceContext().getDirectories());
-  }
+  const dirsChanged = config.getWorkspaceContext().getDirectories();
+  useEffect(() => {
+    if (dirs.length !== dirsChanged.length) {
+      setDirs(dirsChanged);
+    }
+  }, [dirs.length, dirsChanged]);
 
   const completion = useCompletion(
     buffer,
