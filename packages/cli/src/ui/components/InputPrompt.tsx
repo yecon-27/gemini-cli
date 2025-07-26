@@ -60,8 +60,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
 
+  const [dirs, setDirs] = useState<readonly string[]>(
+    config.getWorkspaceContext().getDirectories(),
+  );
+  if (dirs.length !== config.getWorkspaceContext().getDirectories().length) {
+    setDirs(config.getWorkspaceContext().getDirectories());
+  }
+
   const completion = useCompletion(
     buffer,
+    dirs,
     config.getTargetDir(),
     slashCommands,
     commandContext,

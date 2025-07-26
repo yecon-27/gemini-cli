@@ -172,6 +172,9 @@ describe('InputPrompt', () => {
         getProjectRoot: () => path.join('test', 'project'),
         getTargetDir: () => path.join('test', 'project', 'src'),
         getVimMode: () => false,
+        getWorkspaceContext: () => ({
+          getDirectories: () => ['/test/project/src'],
+        }),
       } as unknown as Config,
       slashCommands: mockSlashCommands,
       commandContext: mockCommandContext,
@@ -467,7 +470,6 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'memory', value: 'memory', description: '...' }],
-      activeSuggestionIndex: 0,
     });
     props.buffer.setText('/mem');
 
@@ -535,7 +537,6 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'fix-foo', value: 'fix-foo' }],
-      activeSuggestionIndex: 0,
     });
     props.buffer.setText('/chat resume fi-');
 
@@ -554,7 +555,6 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'memory', value: 'memory' }],
-      activeSuggestionIndex: 0,
     });
     props.buffer.setText('/mem');
 
@@ -585,7 +585,6 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'help', value: 'help' }],
-      activeSuggestionIndex: 0,
     });
     props.buffer.setText('/?');
 
@@ -653,7 +652,6 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'index.ts', value: 'index.ts' }],
-      activeSuggestionIndex: 0,
     });
     props.buffer.setText('@src/components/');
 
@@ -731,6 +729,7 @@ describe('InputPrompt', () => {
       // Verify useCompletion was called with correct signature
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -756,6 +755,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -781,6 +781,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -806,6 +807,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -831,6 +833,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -857,6 +860,7 @@ describe('InputPrompt', () => {
       // Verify useCompletion was called with the buffer
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -882,6 +886,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -908,6 +913,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -934,6 +940,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -960,6 +967,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -986,6 +994,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1014,6 +1023,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1040,6 +1050,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
@@ -1068,6 +1079,7 @@ describe('InputPrompt', () => {
 
       expect(mockedUseCompletion).toHaveBeenCalledWith(
         mockBuffer,
+        ['/test/project/src'],
         path.join('test', 'project', 'src'),
         mockSlashCommands,
         mockCommandContext,
