@@ -357,7 +357,7 @@ export function useCompletion(
 
           const entryPathRelative = path.join(currentRelativePath, entry.name);
           const entryPathFromRoot = path.relative(
-            cwd,
+            startDir,
             path.join(startDir, entry.name),
           );
 
@@ -427,18 +427,19 @@ export function useCompletion(
       });
 
       const suggestions: Suggestion[] = files
-        .map((file: string) => ({
-          label: file,
-          value: escapePath(file),
-        }))
-        .filter((s) => {
+        .filter((file) => {
           if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldIgnoreFile(
-              s.label,
-              filterOptions,
-            ); // relative path
+            return !fileDiscoveryService.shouldIgnoreFile(file, filterOptions);
           }
           return true;
+        })
+        .map((file: string) => {
+          const absolutePath = path.resolve(searchDir, file);
+          const label = path.relative(cwd, absolutePath);
+          return {
+            label,
+            value: escapePath(label),
+          };
         })
         .slice(0, maxResults);
 
@@ -472,8 +473,8 @@ export function useCompletion(
                 dir,
               );
             } else {
-              fetchedSuggestions = await findFilesRecursively(
-                cwd,
+              fetchedSuggestionsPerDir = await findFilesRecursively(
+                dir,
                 prefix,
                 null,
                 filterOptions,
@@ -514,10 +515,13 @@ export function useCompletion(
             }
 
             fetchedSuggestionsPerDir = filteredEntries.map((entry) => {
-              const label = entry.isDirectory() ? entry.name + '/' : entry.name;
+              const absolutePath = path.resolve(baseDirAbsolute, entry.name);
+              const label =
+                cwd === dir ? entry.name : path.relative(cwd, absolutePath);
+              const suggestionLabel = entry.isDirectory() ? label + '/' : label;
               return {
-                label,
-                value: escapePath(label), // Value for completion should be just the name part
+                label: suggestionLabel,
+                value: escapePath(suggestionLabel),
               };
             });
           }
