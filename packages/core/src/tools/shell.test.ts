@@ -107,7 +107,7 @@ describe('ShellTool', () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
       expect(
         shellTool.validateToolParams({ command: 'ls', directory: 'rel/path' }),
-      ).toBe('Directory must exist.');
+      ).toBe("Directory 'rel/path' is not a registered workspace directory.");
     });
   });
 

@@ -132,7 +132,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       );
 
       if (matchingDirs.length === 0) {
-        return `Directory '${params.directory}' is not a registered workspace directory. Use '/directory show' to see available directories.`;
+        return `Directory '${params.directory}' is not a registered workspace directory.`;
       }
 
       if (matchingDirs.length > 1) {

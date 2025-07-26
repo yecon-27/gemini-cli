@@ -22,7 +22,7 @@ describe('useCompletion', () => {
 
   // A minimal mock is sufficient for these tests.
   const mockCommandContext = {} as CommandContext;
-  const testDirs = ['/test/project'];
+  let testDirs: string[];
 
   async function createEmptyDir(...pathSegments: string[]) {
     const fullPath = path.join(testRootDir, ...pathSegments);
@@ -52,10 +52,11 @@ describe('useCompletion', () => {
     testRootDir = await fs.mkdtemp(
       path.join(os.tmpdir(), 'completion-unit-test-'),
     );
+    testDirs = [testRootDir];
     mockConfig = {
       getTargetDir: () => testRootDir,
       getWorkspaceContext: () => ({
-        getDirectories: () => ['/test/project/src'],
+        getDirectories: () => testDirs,
       }),
       getProjectRoot: () => testRootDir,
       getFileFilteringOptions: vi.fn(() => ({

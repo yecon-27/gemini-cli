@@ -479,13 +479,13 @@ export function useCompletion(
                 filterOptions,
               );
             }
-        } else {
-          // Original behavior: list files in the specific directory
-          const lowerPrefix = prefix.toLowerCase();
-          const baseDirAbsolute = path.resolve(dir, baseDirRelative);
-          const entries = await fs.readdir(baseDirAbsolute, {
-            withFileTypes: true,
-          });
+          } else {
+            // Original behavior: list files in the specific directory
+            const lowerPrefix = prefix.toLowerCase();
+            const baseDirAbsolute = path.resolve(dir, baseDirRelative);
+            const entries = await fs.readdir(baseDirAbsolute, {
+              withFileTypes: true,
+            });
 
             // Filter entries using git-aware filtering
             const filteredEntries = [];
