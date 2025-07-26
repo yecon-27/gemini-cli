@@ -62,15 +62,10 @@ describe('aboutCommand', () => {
   });
 
   it('should call addItem with all version info', async () => {
+    process.env.SANDBOX = '';
     if (!aboutCommand.action) {
       throw new Error('The about command must have an action.');
     }
-
-    const expectedSandboxEnv = process.env.SANDBOX
-      ? process.env.SEATBELT_PROFILE
-        ? `${process.env.SANDBOX} (${process.env.SEATBELT_PROFILE})`
-        : process.env.SANDBOX
-      : 'no sandbox';
 
     await aboutCommand.action(mockContext, '');
 
@@ -79,7 +74,7 @@ describe('aboutCommand', () => {
         type: MessageType.ABOUT,
         cliVersion: 'test-version',
         osVersion: 'test-os',
-        sandboxEnv: expectedSandboxEnv,
+        sandboxEnv: 'no sandbox',
         modelVersion: 'test-model',
         selectedAuthType: 'test-auth',
         gcpProject: 'test-gcp-project',

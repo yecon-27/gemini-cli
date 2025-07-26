@@ -470,6 +470,7 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'memory', value: 'memory', description: '...' }],
+      activeSuggestionIndex: 0,
     });
     props.buffer.setText('/mem');
 
@@ -537,6 +538,7 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'fix-foo', value: 'fix-foo' }],
+      activeSuggestionIndex: 0,
     });
     props.buffer.setText('/chat resume fi-');
 
@@ -555,6 +557,7 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'memory', value: 'memory' }],
+      activeSuggestionIndex: 0,
     });
     props.buffer.setText('/mem');
 
@@ -585,6 +588,7 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'help', value: 'help' }],
+      activeSuggestionIndex: 0,
     });
     props.buffer.setText('/?');
 
@@ -652,6 +656,7 @@ describe('InputPrompt', () => {
       ...mockCompletion,
       showSuggestions: true,
       suggestions: [{ label: 'index.ts', value: 'index.ts' }],
+      activeSuggestionIndex: 0,
     });
     props.buffer.setText('@src/components/');
 

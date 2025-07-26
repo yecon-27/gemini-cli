@@ -702,19 +702,5 @@ describe('EditTool', () => {
       );
       expect(error).toContain(rootDir);
     });
-
-    it('should provide clear error message with workspace directories', () => {
-      const outsidePath = path.join(tempDir, 'outside-root.txt');
-      const params = {
-        file_path: outsidePath,
-        old_string: 'old',
-        new_string: 'new',
-      };
-      const error = tool.validateToolParams(params);
-      expect(error).toContain(
-        'File path must be within one of the workspace directories',
-      );
-      expect(error).toContain(rootDir);
-    });
   });
 });

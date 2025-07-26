@@ -122,18 +122,33 @@ describe('WriteFileTool', () => {
     // Default mock implementations that return valid structures
     mockEnsureCorrectEdit.mockImplementation(
       async (
-        _filePath: string,
+        filePath: string,
         _currentContent: string,
         params: EditToolParams,
-        _client: GeminiClient | undefined,
-        _signal?: AbortSignal,
-      ): Promise<CorrectedEditResult> => ({
-        params: { ...params, new_string: params.new_string ?? '' },
-        occurrences: 1,
-      }),
+        _client: GeminiClient,
+        signal?: AbortSignal, // Make AbortSignal optional to match usage
+      ): Promise<CorrectedEditResult> => {
+        if (signal?.aborted) {
+          return Promise.reject(new Error('Aborted'));
+        }
+        return Promise.resolve({
+          params: { ...params, new_string: params.new_string ?? '' },
+          occurrences: 1,
+        });
+      },
     );
     mockEnsureCorrectFileContent.mockImplementation(
-      (content: string): Promise<string> => Promise.resolve(content ?? ''),
+      async (
+        content: string,
+        _client: GeminiClient,
+        signal?: AbortSignal,
+      ): Promise<string> => {
+        // Make AbortSignal optional
+        if (signal?.aborted) {
+          return Promise.reject(new Error('Aborted'));
+        }
+        return Promise.resolve(content ?? '');
+      },
     );
   });
 

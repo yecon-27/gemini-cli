@@ -436,7 +436,7 @@ export function useCompletion(
             return !fileDiscoveryService.shouldIgnoreFile(
               s.label,
               filterOptions,
-            );
+            ); // relative path
           }
           return true;
         })
@@ -514,7 +514,7 @@ export function useCompletion(
             }
 
             fetchedSuggestionsPerDir = filteredEntries.map((entry) => {
-              const label = entry.name + (entry.isDirectory() ? '/' : '');
+              const label = entry.isDirectory() ? entry.name + '/' : entry.name;
               return {
                 label,
                 value: escapePath(label), // Value for completion should be just the name part
@@ -526,12 +526,7 @@ export function useCompletion(
             ...fetchedSuggestionsPerDir,
           ];
         }
-        const uniqueSuggestions = new Map<string, Suggestion>();
-        for (const suggestion of fetchedSuggestions) {
-          if (!uniqueSuggestions.has(suggestion.label)) {
-            uniqueSuggestions.set(suggestion.label, suggestion);
-          }
-        }
+
         // Like glob, we always return forwardslashes, even in windows.
         fetchedSuggestions = fetchedSuggestions.map((suggestion) => ({
           ...suggestion,

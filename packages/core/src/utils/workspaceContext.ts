@@ -23,10 +23,8 @@ export class WorkspaceContext {
   constructor(initialDirectory: string, additionalDirectories: string[] = []) {
     this.directories = new Set<string>();
 
-    // Add initial directory
     this.addDirectoryInternal(initialDirectory);
 
-    // Add any additional directories
     for (const dir of additionalDirectories) {
       this.addDirectoryInternal(dir);
     }
@@ -48,23 +46,19 @@ export class WorkspaceContext {
     directory: string,
     basePath: string = process.cwd(),
   ): void {
-    // Resolve to absolute path
     const absolutePath = path.isAbsolute(directory)
       ? directory
       : path.resolve(basePath, directory);
 
-    // Check if directory exists
     if (!fs.existsSync(absolutePath)) {
       throw new Error(`Directory does not exist: ${absolutePath}`);
     }
 
-    // Check if it's actually a directory
     const stats = fs.statSync(absolutePath);
     if (!stats.isDirectory()) {
       throw new Error(`Path is not a directory: ${absolutePath}`);
     }
 
-    // Resolve symbolic links
     let realPath: string;
     try {
       realPath = fs.realpathSync(absolutePath);
@@ -72,7 +66,6 @@ export class WorkspaceContext {
       throw new Error(`Failed to resolve path: ${absolutePath}`);
     }
 
-    // Add to the set (automatically prevents duplicates)
     this.directories.add(realPath);
   }
 
@@ -91,21 +84,17 @@ export class WorkspaceContext {
    */
   isPathWithinWorkspace(pathToCheck: string): boolean {
     try {
-      // Resolve the path to absolute
       const absolutePath = path.resolve(pathToCheck);
 
-      // Try to resolve symbolic links if the path exists
       let resolvedPath = absolutePath;
       if (fs.existsSync(absolutePath)) {
         try {
           resolvedPath = fs.realpathSync(absolutePath);
         } catch (_error) {
-          // If we can't resolve (e.g., circular symlinks), reject the path
           return false;
         }
       }
 
-      // Check if the resolved path is within any workspace directory
       for (const dir of this.directories) {
         if (this.isPathWithinRoot(resolvedPath, dir)) {
           return true;
@@ -114,7 +103,6 @@ export class WorkspaceContext {
 
       return false;
     } catch (_error) {
-      // On any error, default to rejecting the path
       return false;
     }
   }

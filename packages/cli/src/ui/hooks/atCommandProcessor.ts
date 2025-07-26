@@ -223,10 +223,9 @@ export async function handleAtCommand({
       continue;
     }
 
-    let currentPathSpec = pathName;
-    let resolvedSuccessfully = false;
-
     for (const dir of config.getWorkspaceContext().getDirectories()) {
+      let currentPathSpec = pathName;
+      let resolvedSuccessfully = false;
       try {
         const absolutePath = path.resolve(dir, pathName);
         const stats = await fs.stat(absolutePath);
@@ -240,7 +239,6 @@ export async function handleAtCommand({
           onDebugMessage(`Path ${pathName} resolved to file: ${absolutePath}`);
         }
         resolvedSuccessfully = true;
-        break;
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
           if (config.getEnableRecursiveFileSearch() && globTool) {
@@ -301,12 +299,11 @@ export async function handleAtCommand({
           );
         }
       }
-    }
-
-    if (resolvedSuccessfully) {
-      pathSpecsToRead.push(currentPathSpec);
-      atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
-      contentLabelsForDisplay.push(pathName);
+      if (resolvedSuccessfully) {
+        pathSpecsToRead.push(currentPathSpec);
+        atPathToResolvedSpecMap.set(originalAtPath, currentPathSpec);
+        contentLabelsForDisplay.push(pathName);
+      }
     }
   }
 
