@@ -128,7 +128,6 @@ class GeminiAgent implements Agent {
             },
           },
           promptId,
-          pendingSend.signal,
         );
         nextMessage = null;
 

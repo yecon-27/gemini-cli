@@ -93,7 +93,6 @@ describe('runNonInteractive', () => {
         },
       },
       expect.any(String),
-      expect.any(AbortSignal),
     );
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Hello');
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(' World');
@@ -150,7 +149,6 @@ describe('runNonInteractive', () => {
         message: [toolResponsePart],
       }),
       expect.any(String),
-      expect.any(AbortSignal),
     );
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Final answer');
   });
@@ -208,7 +206,6 @@ describe('runNonInteractive', () => {
         message: [errorResponsePart],
       }),
       expect.any(String),
-      expect.any(AbortSignal),
     );
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(
       'Could not complete request.',
@@ -292,7 +289,6 @@ describe('runNonInteractive', () => {
         message: [errorResponsePart],
       }),
       expect.any(String),
-      expect.any(AbortSignal),
     );
 
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(

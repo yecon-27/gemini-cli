@@ -185,7 +185,6 @@ export class Turn {
           },
         },
         this.prompt_id,
-        signal,
       );
 
       for await (const resp of responseStream) {

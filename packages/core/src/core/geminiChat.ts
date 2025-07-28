@@ -382,16 +382,19 @@ export class GeminiChat {
   async sendMessageStream(
     params: SendMessageParameters,
     prompt_id: string,
-    signal: AbortSignal,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     if (this.lastPromptId !== prompt_id) {
       this.loopDetectionService.reset(prompt_id);
       this.lastPromptId = prompt_id;
     }
 
-    const loopDetected = await this.loopDetectionService.turnStarted(signal);
-    if (loopDetected) {
-      throw new LoopDetectedError();
+    const signal = (params.config as { abortSignal?: AbortSignal })
+      ?.abortSignal;
+    if (signal) {
+      const loopDetected = await this.loopDetectionService.turnStarted(signal);
+      if (loopDetected) {
+        throw new LoopDetectedError();
+      }
     }
 
     await this.sendPromise;
