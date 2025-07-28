@@ -109,7 +109,11 @@ describe('GeminiChat', () => {
         response,
       );
 
-      await chat.sendMessageStream({ message: 'hello' }, 'prompt-id-1');
+      await chat.sendMessageStream(
+        { message: 'hello' },
+        'prompt-id-1',
+        new AbortController().signal,
+      );
 
       expect(mockModelsModule.generateContentStream).toHaveBeenCalledWith({
         model: 'gemini-pro',

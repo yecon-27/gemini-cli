@@ -32,6 +32,7 @@ import {
   ApiResponseEvent,
 } from '../telemetry/types.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { LoopDetectionService } from '../services/loopDetectionService.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -116,6 +117,13 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   return curatedHistory;
 }
 
+class LoopDetectedError extends Error {
+  constructor() {
+    super('Loop detected');
+    this.name = 'LoopDetectedError';
+  }
+}
+
 /**
  * Chat session that enables sending messages to the model with previous
  * conversation context.
@@ -127,6 +135,8 @@ export class GeminiChat {
   // A promise to represent the current state of the message being sent to the
   // model.
   private sendPromise: Promise<void> = Promise.resolve();
+  readonly loopDetectionService: LoopDetectionService;
+  private lastPromptId?: string;
 
   constructor(
     private readonly config: Config,
@@ -135,6 +145,7 @@ export class GeminiChat {
     private history: Content[] = [],
   ) {
     validateHistory(history);
+    this.loopDetectionService = new LoopDetectionService(config);
   }
 
   private _getRequestTextFromContents(contents: Content[]): string {
@@ -371,7 +382,18 @@ export class GeminiChat {
   async sendMessageStream(
     params: SendMessageParameters,
     prompt_id: string,
+    signal: AbortSignal,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    if (this.lastPromptId !== prompt_id) {
+      this.loopDetectionService.reset(prompt_id);
+      this.lastPromptId = prompt_id;
+    }
+
+    const loopDetected = await this.loopDetectionService.turnStarted(signal);
+    if (loopDetected) {
+      throw new LoopDetectedError();
+    }
+
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
@@ -519,6 +541,9 @@ export class GeminiChat {
     try {
       for await (const chunk of streamResponse) {
         if (isValidResponse(chunk)) {
+          if (this.loopDetectionService.addAndCheck(chunk)) {
+            throw new LoopDetectedError();
+          }
           chunks.push(chunk);
           const content = chunk.candidates?.[0]?.content;
           if (content !== undefined) {

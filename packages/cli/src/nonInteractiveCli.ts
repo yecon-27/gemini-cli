@@ -89,6 +89,7 @@ export async function runNonInteractive(
           },
         },
         prompt_id,
+        abortController.signal,
       );
 
       for await (const resp of responseStream) {

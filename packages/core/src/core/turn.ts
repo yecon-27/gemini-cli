@@ -185,6 +185,7 @@ export class Turn {
           },
         },
         this.prompt_id,
+        signal,
       );
 
       for await (const resp of responseStream) {
@@ -242,6 +243,10 @@ export class Turn {
         }
       }
     } catch (e) {
+      if (e instanceof Error && e.name === 'LoopDetectedError') {
+        yield { type: GeminiEventType.LoopDetected };
+        return;
+      }
       const error = toFriendlyError(e);
       if (error instanceof UnauthorizedError) {
         throw error;

@@ -5,11 +5,15 @@
  */
 
 import { createHash } from 'crypto';
-import { GeminiEventType, ServerGeminiStreamEvent } from '../core/turn.js';
 import { logLoopDetected } from '../telemetry/loggers.js';
 import { LoopDetectedEvent, LoopType } from '../telemetry/types.js';
 import { Config, DEFAULT_GEMINI_FLASH_MODEL } from '../config/config.js';
-import { SchemaUnion, Type } from '@google/genai';
+import {
+  FunctionCall,
+  GenerateContentResponse,
+  SchemaUnion,
+  Type,
+} from '@google/genai';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -71,35 +75,47 @@ export class LoopDetectionService {
     this.config = config;
   }
 
-  private getToolCallKey(toolCall: { name: string; args: object }): string {
-    const argsString = JSON.stringify(toolCall.args);
+  private getToolCallKey(toolCall: FunctionCall): string {
+    const args = toolCall.args ?? {};
+    const keys = Object.keys(args).sort();
+    const parts = keys.map(
+      (key) => `${JSON.stringify(key)}:${JSON.stringify(args[key])}`,
+    );
+    const argsString = `{${parts.join(',')}}`;
     const keyString = `${toolCall.name}:${argsString}`;
     return createHash('sha256').update(keyString).digest('hex');
   }
 
   /**
-   * Processes a stream event and checks for loop conditions.
-   * @param event - The stream event to process
+   * Processes a response chunk and checks for loop conditions.
+   * @param chunk - The GenerateContentResponse chunk to process
    * @returns true if a loop is detected, false otherwise
    */
-  addAndCheck(event: ServerGeminiStreamEvent): boolean {
+  addAndCheck(chunk: GenerateContentResponse): boolean {
     if (this.loopDetected) {
       return true;
     }
 
-    switch (event.type) {
-      case GeminiEventType.ToolCallRequest:
+    const parts = chunk.candidates?.[0]?.content?.parts;
+    if (!parts) {
+      return false;
+    }
+
+    for (const part of parts) {
+      if (part.functionCall) {
         // content chanting only happens in one single stream, reset if there
         // is a tool call in between
         this.resetContentTracking();
-        this.loopDetected = this.checkToolCallLoop(event.value);
+        this.loopDetected = this.checkToolCallLoop(part.functionCall);
+      } else if (part.text) {
+        this.loopDetected = this.checkContentLoop(part.text);
+      }
+
+      if (this.loopDetected) {
         break;
-      case GeminiEventType.Content:
-        this.loopDetected = this.checkContentLoop(event.value);
-        break;
-      default:
-        break;
+      }
     }
+
     return this.loopDetected;
   }
 
@@ -127,7 +143,10 @@ export class LoopDetectionService {
     return false;
   }
 
-  private checkToolCallLoop(toolCall: { name: string; args: object }): boolean {
+  private checkToolCallLoop(toolCall: FunctionCall): boolean {
+    if (!toolCall.name) {
+      return false;
+    }
     const key = this.getToolCallKey(toolCall);
     if (this.lastToolCallKey === key) {
       this.toolCallRepetitionCount++;
