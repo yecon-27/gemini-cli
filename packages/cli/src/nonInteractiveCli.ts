@@ -11,6 +11,7 @@ import {
   ToolRegistry,
   shutdownTelemetry,
   isTelemetrySdkInitialized,
+  checkNextSpeaker,
 } from '@google/gemini-cli-core';
 import {
   Content,
@@ -152,8 +153,20 @@ export async function runNonInteractive(
         }
         currentMessages = [{ role: 'user', parts: toolResponseParts }];
       } else {
-        process.stdout.write('\n'); // Ensure a final newline
-        return;
+        const nextSpeakerCheck = await checkNextSpeaker(
+          chat,
+          geminiClient,
+          abortController.signal,
+        );
+
+        if (nextSpeakerCheck?.next_speaker === 'model') {
+          currentMessages = [
+            { role: 'user', parts: [{ text: 'Please continue.' }] },
+          ];
+        } else {
+          process.stdout.write('\n'); // Ensure a final newline
+          return;
+        }
       }
     }
   } catch (error) {

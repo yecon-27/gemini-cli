@@ -7,7 +7,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runNonInteractive } from './nonInteractiveCli.js';
-import { Config, GeminiClient, ToolRegistry } from '@google/gemini-cli-core';
+import {
+  Config,
+  GeminiClient,
+  ToolRegistry,
+  checkNextSpeaker,
+} from '@google/gemini-cli-core';
 import { GenerateContentResponse, Part, FunctionCall } from '@google/genai';
 
 // Mock dependencies
@@ -20,6 +25,7 @@ vi.mock('@google/gemini-cli-core', async () => {
     GeminiClient: vi.fn(),
     ToolRegistry: vi.fn(),
     executeToolCall: vi.fn(),
+    checkNextSpeaker: vi.fn(),
   };
 });
 
@@ -29,14 +35,20 @@ describe('runNonInteractive', () => {
   let mockToolRegistry: ToolRegistry;
   let mockChat: {
     sendMessageStream: ReturnType<typeof vi.fn>;
+    getHistory: ReturnType<typeof vi.fn>;
   };
   let mockProcessStdoutWrite: ReturnType<typeof vi.fn>;
   let mockProcessExit: ReturnType<typeof vi.fn>;
+  let mockCheckNextSpeaker: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetAllMocks();
+
+    mockCheckNextSpeaker = vi.mocked(checkNextSpeaker);
+
     mockChat = {
       sendMessageStream: vi.fn(),
+      getHistory: vi.fn().mockReturnValue([]),
     };
     mockGeminiClient = {
       getChat: vi.fn().mockResolvedValue(mockChat),
@@ -81,6 +93,7 @@ describe('runNonInteractive', () => {
       } as GenerateContentResponse;
     })();
     mockChat.sendMessageStream.mockResolvedValue(inputStream);
+    mockCheckNextSpeaker.mockResolvedValue({ next_speaker: 'user' } as any);
 
     await runNonInteractive(mockConfig, 'Test input', 'prompt-id-1');
 
@@ -96,6 +109,32 @@ describe('runNonInteractive', () => {
     );
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Hello');
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith(' World');
+    expect(mockProcessStdoutWrite).toHaveBeenCalledWith('\n');
+  });
+
+  it('should continue if model wants to speak next', async () => {
+    const inputStream1 = (async function* () {
+      yield {
+        candidates: [{ content: { parts: [{ text: 'Thinking...' }] } }],
+      } as GenerateContentResponse;
+    })();
+    const inputStream2 = (async function* () {
+      yield {
+        candidates: [{ content: { parts: [{ text: 'Done.' }] } }],
+      } as GenerateContentResponse;
+    })();
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(inputStream1)
+      .mockResolvedValueOnce(inputStream2);
+    mockCheckNextSpeaker
+      .mockResolvedValueOnce({ next_speaker: 'model' } as any)
+      .mockResolvedValueOnce({ next_speaker: 'user' } as any);
+
+    await runNonInteractive(mockConfig, 'Test input', 'prompt-id-1');
+
+    expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(2);
+    expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Thinking...');
+    expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Done.');
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith('\n');
   });
 
@@ -134,6 +173,7 @@ describe('runNonInteractive', () => {
     mockChat.sendMessageStream
       .mockResolvedValueOnce(stream1)
       .mockResolvedValueOnce(stream2);
+    mockCheckNextSpeaker.mockResolvedValue({ next_speaker: 'user' } as any);
 
     await runNonInteractive(mockConfig, 'Use a tool', 'prompt-id-2');
 
@@ -153,7 +193,7 @@ describe('runNonInteractive', () => {
     expect(mockProcessStdoutWrite).toHaveBeenCalledWith('Final answer');
   });
 
-  it('should handle error during tool execution', async () => {
+  it('should handle error during tool execution and exit', async () => {
     const functionCall: FunctionCall = {
       id: 'fcError',
       name: 'errorTool',
@@ -181,16 +221,7 @@ describe('runNonInteractive', () => {
       yield { functionCalls: [functionCall] } as GenerateContentResponse;
     })();
 
-    const stream2 = (async function* () {
-      yield {
-        candidates: [
-          { content: { parts: [{ text: 'Could not complete request.' }] } },
-        ],
-      } as GenerateContentResponse;
-    })();
-    mockChat.sendMessageStream
-      .mockResolvedValueOnce(stream1)
-      .mockResolvedValueOnce(stream2);
+    mockChat.sendMessageStream.mockResolvedValueOnce(stream1);
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
@@ -201,15 +232,7 @@ describe('runNonInteractive', () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       'Error executing tool errorTool: Tool execution failed badly',
     );
-    expect(mockChat.sendMessageStream).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        message: [errorResponsePart],
-      }),
-      expect.any(String),
-    );
-    expect(mockProcessStdoutWrite).toHaveBeenCalledWith(
-      'Could not complete request.',
-    );
+    expect(mockProcessExit).toHaveBeenCalledWith(1);
   });
 
   it('should exit with error if sendMessageStream throws initially', async () => {
@@ -267,6 +290,7 @@ describe('runNonInteractive', () => {
     mockChat.sendMessageStream
       .mockResolvedValueOnce(stream1)
       .mockResolvedValueOnce(stream2);
+    mockCheckNextSpeaker.mockResolvedValue({ next_speaker: 'user' } as any);
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
@@ -332,12 +356,11 @@ describe('runNonInteractive', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => {});
 
-    await runNonInteractive(mockConfig, 'Trigger loop');
+    await runNonInteractive(mockConfig, 'Trigger loop', 'prompt-id-6');
 
     expect(mockChat.sendMessageStream).toHaveBeenCalledTimes(1);
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      `
- Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.`,
+      '\n Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json.',
     );
     expect(mockProcessExit).not.toHaveBeenCalled();
   });
