@@ -215,6 +215,7 @@ describe('loggers', () => {
         100,
         'prompt-id-1',
         AuthType.LOGIN_WITH_GOOGLE,
+        '',
         usageData,
         'test-response',
       );
@@ -278,6 +279,7 @@ describe('loggers', () => {
         100,
         'prompt-id-1',
         AuthType.USE_GEMINI,
+        '',
         usageData,
         'test-response',
         'test-error',

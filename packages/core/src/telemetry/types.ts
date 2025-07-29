@@ -205,12 +205,14 @@ export class ApiResponseEvent {
   total_token_count: number;
   response_text?: string;
   prompt_id: string;
+  response_id: string;
   auth_type?: string;
 
   constructor(
     model: string,
     duration_ms: number,
     prompt_id: string,
+    response_id: string,
     auth_type?: string,
     usage_data?: GenerateContentResponseUsageMetadata,
     response_text?: string,
@@ -230,6 +232,7 @@ export class ApiResponseEvent {
     this.response_text = response_text;
     this.error = error;
     this.prompt_id = prompt_id;
+    this.response_id = response_id;
     this.auth_type = auth_type;
   }
 }

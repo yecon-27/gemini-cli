@@ -156,6 +156,7 @@ export class GeminiChat {
   private async _logApiResponse(
     durationMs: number,
     prompt_id: string,
+    response_id: string,
     usageMetadata?: GenerateContentResponseUsageMetadata,
     responseText?: string,
   ): Promise<void> {
@@ -165,6 +166,7 @@ export class GeminiChat {
         this.config.getModel(),
         durationMs,
         prompt_id,
+        response_id,
         this.config.getContentGeneratorConfig()?.authType,
         usageMetadata,
         responseText,
@@ -310,6 +312,7 @@ export class GeminiChat {
       await this._logApiResponse(
         durationMs,
         prompt_id,
+        response.responseId || '',
         response.usageMetadata,
         JSON.stringify(response),
       );
@@ -550,6 +553,7 @@ export class GeminiChat {
       await this._logApiResponse(
         durationMs,
         prompt_id,
+        chunks[0]?.responseId || '',
         this.getFinalUsageMetadata(chunks),
         JSON.stringify(chunks),
       );
