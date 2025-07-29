@@ -350,7 +350,7 @@ export function logNextSpeakerCheck(
 
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
-    body: `Flash decided to continue.`,
+    body: `Performed next speaker check.`,
     attributes,
   };
   logger.emit(logRecord);
