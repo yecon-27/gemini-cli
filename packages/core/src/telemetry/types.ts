@@ -321,5 +321,5 @@ export type TelemetryEvent =
   | FlashFallbackEvent
   | LoopDetectedEvent
   | NextSpeakerCheckEvent
-  | FlashDecidedToContinueEvent;
+  | FlashDecidedToContinueEvent
   | SlashCommandEvent;
