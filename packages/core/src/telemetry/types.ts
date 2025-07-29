@@ -282,11 +282,13 @@ export class NextSpeakerCheckEvent {
   'event.name': 'next_speaker_check';
   'event.timestamp': string; // ISO 8601
   prompt_id: string;
+  result: string;
 
-  constructor(prompt_id: string) {
+  constructor(prompt_id: string, result: string) {
     this['event.name'] = 'next_speaker_check';
     this['event.timestamp'] = new Date().toISOString();
     this.prompt_id = prompt_id;
+    this.result = result;
   }
 }
 

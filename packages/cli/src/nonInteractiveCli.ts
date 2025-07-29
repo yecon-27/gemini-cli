@@ -160,7 +160,7 @@ export async function runNonInteractive(
           geminiClient,
           abortController.signal,
         );
-        logNextSpeakerCheck(config, new NextSpeakerCheckEvent(prompt_id));
+        logNextSpeakerCheck(config, new NextSpeakerCheckEvent(prompt_id, nextSpeakerCheck?.next_speaker || 'error'));
 
         if (nextSpeakerCheck?.next_speaker === 'model') {
           currentMessages = [
