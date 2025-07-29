@@ -93,7 +93,6 @@ import { SettingsDialog } from './components/SettingsDialog.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
 
-
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
 interface AppProps {
@@ -413,7 +412,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
     config.setFlashFallbackHandler(flashFallbackHandler);
   }, [config, addItem, userTier]);
-
 
   const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
     useSettingsCommand();
@@ -846,7 +844,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-
           {isSettingsDialogOpen ? (
             <Box flexDirection="column">
               <SettingsDialog
@@ -855,9 +852,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                 onRestartRequest={() => process.exit(0)}
               />
             </Box>
-          {shellConfirmationRequest ? (
+          ) : shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
-
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
               {themeError && (

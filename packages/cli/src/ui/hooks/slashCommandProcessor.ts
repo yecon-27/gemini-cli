@@ -332,6 +332,9 @@ export const useSlashCommandProcessor = (
                     case 'privacy':
                       openPrivacyNotice();
                       return { type: 'handled' };
+                    case 'settings':
+                      openSettingsDialog();
+                      return { type: 'handled' };
                     default: {
                       const unhandled: never = result.dialog;
                       throw new Error(
@@ -387,13 +390,6 @@ export const useSlashCommandProcessor = (
                     approvedCommands.length === 0
                   ) {
                     return { type: 'handled' };
-                  case 'settings':
-                    openSettingsDialog();
-                    return { type: 'handled' };
-                  default: {
-                    const unhandled: never = result.dialog;
-                    throw new Error(
-                      `Unhandled slash command result: ${unhandled}`,
                   }
 
                   if (outcome === ToolConfirmationOutcome.ProceedAlways) {

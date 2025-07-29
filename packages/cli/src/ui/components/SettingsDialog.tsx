@@ -60,12 +60,10 @@ export function SettingsDialog({
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
 
   // Local pending settings state for the selected scope
-  const [pendingSettings, setPendingSettings] = useState<Settings>(() => {
+  const [pendingSettings, setPendingSettings] = useState<Settings>(() =>
     // Deep clone to avoid mutation
-    return JSON.parse(
-      JSON.stringify(settings.forScope(selectedScope).settings),
-    );
-  });
+    JSON.parse(JSON.stringify(settings.forScope(selectedScope).settings)),
+  );
 
   // Reset pending settings when scope changes
   useEffect(() => {
@@ -278,6 +276,25 @@ export function SettingsDialog({
       checked: getScopedValue('ideMode') ?? false,
       toggle: () => {
         updateSetting('ideMode', !(getScopedValue('ideMode') ?? false));
+      },
+    },
+    {
+      label: 'Vim Mode',
+      value: 'vimMode',
+      checked: getScopedValue('vimMode') ?? false,
+      toggle: () => {
+        updateSetting('vimMode', !(getScopedValue('vimMode') ?? false));
+      },
+    },
+    {
+      label: 'Disable Auto Update',
+      value: 'disableAutoUpdate',
+      checked: getScopedValue('disableAutoUpdate') ?? false,
+      toggle: () => {
+        updateSetting(
+          'disableAutoUpdate',
+          !(getScopedValue('disableAutoUpdate') ?? false),
+        );
       },
     },
   ];
