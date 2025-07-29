@@ -26,7 +26,7 @@ export {
   logApiError,
   logApiResponse,
   logFlashFallback,
-  logNextSpeakerCheck
+  logNextSpeakerCheck,
   logSlashCommand,
 } from './loggers.js';
 export {
@@ -39,7 +39,7 @@ export {
   ApiResponseEvent,
   TelemetryEvent,
   FlashFallbackEvent,
-  NextSpeakerCheckEvent
+  NextSpeakerCheckEvent,
   SlashCommandEvent,
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
