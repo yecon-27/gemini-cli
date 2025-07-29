@@ -302,7 +302,7 @@ describe('App UI', () => {
         getDirectories: vi.fn(() => ['/test/dir']),
       }));
     }
-    vi.mocked(ideContext.getOpenFilesContext).mockReturnValue(undefined);
+    vi.mocked(ideContext.getIdeContext).mockReturnValue(undefined);
   });
 
   afterEach(() => {
