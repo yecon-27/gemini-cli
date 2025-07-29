@@ -13,7 +13,7 @@ import {
   isTelemetrySdkInitialized,
   checkNextSpeaker,
   logNextSpeakerCheck,
-  NextSpeakerCheckEvent
+  NextSpeakerCheckEvent,
 } from '@google/gemini-cli-core';
 import {
   Content,
@@ -80,6 +80,7 @@ export async function runNonInteractive(
         return;
       }
       const functionCalls: FunctionCall[] = [];
+      let lastModelResponse = '';
 
       const responseStream = await chat.sendMessageStream(
         {
@@ -101,6 +102,7 @@ export async function runNonInteractive(
         }
         const textPart = getResponseText(resp);
         if (textPart) {
+          lastModelResponse += textPart;
           process.stdout.write(textPart);
         }
         if (resp.functionCalls) {
@@ -160,7 +162,14 @@ export async function runNonInteractive(
           geminiClient,
           abortController.signal,
         );
-        logNextSpeakerCheck(config, new NextSpeakerCheckEvent(prompt_id, nextSpeakerCheck?.next_speaker || 'error'));
+        logNextSpeakerCheck(
+          config,
+          new NextSpeakerCheckEvent(
+            prompt_id,
+            nextSpeakerCheck?.next_speaker || 'error',
+            lastModelResponse,
+          ),
+        );
 
         if (nextSpeakerCheck?.next_speaker === 'model') {
           currentMessages = [

@@ -286,12 +286,14 @@ export class NextSpeakerCheckEvent {
   'event.timestamp': string; // ISO 8601
   prompt_id: string;
   result: string;
+  last_model_response?: string;
 
-  constructor(prompt_id: string, result: string) {
+  constructor(prompt_id: string, result: string, last_model_response?: string) {
     this['event.name'] = 'next_speaker_check';
     this['event.timestamp'] = new Date().toISOString();
     this.prompt_id = prompt_id;
     this.result = result;
+    this.last_model_response = last_model_response;
   }
 }
 
@@ -306,7 +308,6 @@ export class SlashCommandEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.command = command;
     this.subcommand = subcommand;
-
   }
 }
 
