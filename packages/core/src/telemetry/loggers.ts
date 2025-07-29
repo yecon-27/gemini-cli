@@ -18,6 +18,7 @@ import {
   EVENT_FLASH_DECIDED_TO_CONTINUE,
   EVENT_NEXT_SPEAKER_CHECL,
   SERVICE_NAME,
+  EVENT_SLASH_COMMAND,
 } from './constants.js';
 import {
   ApiErrorEvent,
@@ -30,6 +31,7 @@ import {
   FlashDecidedToContinueEvent,
   LoopDetectedEvent,
   NextSpeakerCheckEvent,
+  SlashCommandEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -351,6 +353,27 @@ export function logNextSpeakerCheck(
   const logger = logs.getLogger(SERVICE_NAME);
   const logRecord: LogRecord = {
     body: `Performed next speaker check.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logSlashCommand(
+  config: Config,
+  event: SlashCommandEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logSlashCommandEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_SLASH_COMMAND,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Slash command: ${event.command}.`,
     attributes,
   };
   logger.emit(logRecord);

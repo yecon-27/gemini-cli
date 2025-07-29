@@ -27,6 +27,7 @@ export {
   logApiResponse,
   logFlashFallback,
   logNextSpeakerCheck
+  logSlashCommand,
 } from './loggers.js';
 export {
   StartSessionEvent,
@@ -39,6 +40,7 @@ export {
   TelemetryEvent,
   FlashFallbackEvent,
   NextSpeakerCheckEvent
+  SlashCommandEvent,
 } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';

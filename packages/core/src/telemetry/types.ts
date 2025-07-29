@@ -295,6 +295,21 @@ export class NextSpeakerCheckEvent {
   }
 }
 
+export class SlashCommandEvent {
+  'event.name': 'slash_command';
+  'event.timestamp': string; // ISO 8106
+  command: string;
+  subcommand?: string;
+
+  constructor(command: string, subcommand?: string) {
+    this['event.name'] = 'slash_command';
+    this['event.timestamp'] = new Date().toISOString();
+    this.command = command;
+    this.subcommand = subcommand;
+
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -307,3 +322,4 @@ export type TelemetryEvent =
   | LoopDetectedEvent
   | NextSpeakerCheckEvent
   | FlashDecidedToContinueEvent;
+  | SlashCommandEvent;
