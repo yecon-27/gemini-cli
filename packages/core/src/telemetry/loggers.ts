@@ -16,6 +16,7 @@ import {
   EVENT_USER_PROMPT,
   EVENT_FLASH_FALLBACK,
   EVENT_FLASH_DECIDED_TO_CONTINUE,
+  EVENT_NEXT_SPEAKER_CHECL,
   SERVICE_NAME,
 } from './constants.js';
 import {
@@ -28,6 +29,7 @@ import {
   FlashFallbackEvent,
   FlashDecidedToContinueEvent,
   LoopDetectedEvent,
+  NextSpeakerCheckEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -323,6 +325,27 @@ export function logFlashDecidedToContinue(
     ...getCommonAttributes(config),
     ...event,
     'event.name': EVENT_FLASH_DECIDED_TO_CONTINUE,
+  };
+
+  const logger = logs.getLogger(SERVICE_NAME);
+  const logRecord: LogRecord = {
+    body: `Flash decided to continue.`,
+    attributes,
+  };
+  logger.emit(logRecord);
+}
+
+export function logNextSpeakerCheck(
+  config: Config,
+  event: NextSpeakerCheckEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logNextSpeakerCheckEvent(event);
+  if (!isTelemetrySdkInitialized()) return;
+
+  const attributes: LogAttributes = {
+    ...getCommonAttributes(config),
+    ...event,
+    'event.name': EVENT_NEXT_SPEAKER_CHECL,
   };
 
   const logger = logs.getLogger(SERVICE_NAME);

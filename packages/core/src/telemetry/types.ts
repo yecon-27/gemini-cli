@@ -278,6 +278,18 @@ export class FlashDecidedToContinueEvent {
   }
 }
 
+export class NextSpeakerCheckEvent {
+  'event.name': 'next_speaker_check';
+  'event.timestamp': string; // ISO 8601
+  prompt_id: string;
+
+  constructor(prompt_id: string) {
+    this['event.name'] = 'next_speaker_check';
+    this['event.timestamp'] = new Date().toISOString();
+    this.prompt_id = prompt_id;
+  }
+}
+
 export type TelemetryEvent =
   | StartSessionEvent
   | EndSessionEvent
@@ -288,4 +300,5 @@ export type TelemetryEvent =
   | ApiResponseEvent
   | FlashFallbackEvent
   | LoopDetectedEvent
+  | NextSpeakerCheckEvent
   | FlashDecidedToContinueEvent;

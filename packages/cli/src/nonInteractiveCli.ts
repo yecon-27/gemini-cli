@@ -21,6 +21,8 @@ import {
 } from '@google/genai';
 
 import { parseAndFormatApiError } from './ui/utils/errorParsing.js';
+import { logNextSpeakerCheck } from '@google/gemini-cli-core/src/telemetry/loggers.js';
+import { NextSpeakerCheckEvent } from '@google/gemini-cli-core/src/telemetry/types.js';
 
 function getResponseText(response: GenerateContentResponse): string | null {
   if (response.candidates && response.candidates.length > 0) {
@@ -158,6 +160,7 @@ export async function runNonInteractive(
           geminiClient,
           abortController.signal,
         );
+        logNextSpeakerCheck(config, new NextSpeakerCheckEvent(prompt_id));
 
         if (nextSpeakerCheck?.next_speaker === 'model') {
           currentMessages = [
