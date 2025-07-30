@@ -118,6 +118,10 @@ export class WorkspaceContext {
     rootDirectory: string,
   ): boolean {
     const relative = path.relative(rootDirectory, pathToCheck);
-    return !relative.startsWith('..') && !path.isAbsolute(relative);
+    return (
+      !relative.startsWith(`..${path.sep}`) &&
+      relative !== '..' &&
+      !path.isAbsolute(relative)
+    );
   }
 }
