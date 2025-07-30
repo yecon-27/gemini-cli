@@ -12,6 +12,8 @@ import {
   SettingScope,
   Settings,
 } from '../../config/settings.js';
+import { getScopeItems } from '../../utils/dialogScopeUtils.js';
+import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -31,12 +33,6 @@ interface FileFilteringSettings {
   enableRecursiveFileSearch?: boolean;
 }
 
-const SCOPE_LABELS = {
-  [SettingScope.User]: 'User Settings',
-  [SettingScope.Workspace]: 'Workspace Settings',
-  [SettingScope.System]: 'System Settings',
-};
-
 const maxItemsToShow = 8;
 
 export function SettingsDialog({
@@ -54,7 +50,6 @@ export function SettingsDialog({
   );
   // Active indices
   const [activeSettingIndex, setActiveSettingIndex] = useState(0);
-  const [activeScopeIndex, setActiveScopeIndex] = useState(0);
   // Scroll offset for settings
   const [scrollOffset, setScrollOffset] = useState(0);
   const [showRestartPrompt, setShowRestartPrompt] = useState(false);
@@ -62,14 +57,20 @@ export function SettingsDialog({
   // Local pending settings state for the selected scope
   const [pendingSettings, setPendingSettings] = useState<Settings>(() =>
     // Deep clone to avoid mutation
-    JSON.parse(JSON.stringify(settings.forScope(selectedScope).settings)),
+    structuredClone(settings.forScope(selectedScope).settings),
+  );
+
+  // Track which settings have been modified by the user
+  const [modifiedSettings, setModifiedSettings] = useState<Set<string>>(
+    new Set(),
   );
 
   // Reset pending settings when scope changes
   useEffect(() => {
     setPendingSettings(
-      JSON.parse(JSON.stringify(settings.forScope(selectedScope).settings)),
+      structuredClone(settings.forScope(selectedScope).settings),
     );
+    setModifiedSettings(new Set()); // Reset modified settings when scope changes
   }, [selectedScope, settings]);
 
   // Helper to get value for a given scope (from pendingSettings)
@@ -107,6 +108,7 @@ export function SettingsDialog({
       ...prev,
       accessibility: { ...(prev.accessibility || {}), [key]: value },
     }));
+    setModifiedSettings((prev) => new Set(prev).add(`accessibility.${key}`));
     setShowRestartPrompt(true);
   };
   const updateCheckpointing = (
@@ -117,6 +119,7 @@ export function SettingsDialog({
       ...prev,
       checkpointing: { ...(prev.checkpointing || {}), [key]: value },
     }));
+    setModifiedSettings((prev) => new Set(prev).add(`checkpointing.${key}`));
     setShowRestartPrompt(true);
   };
   const updateFileFiltering = (
@@ -127,6 +130,7 @@ export function SettingsDialog({
       ...prev,
       fileFiltering: { ...(prev.fileFiltering || {}), [key]: value },
     }));
+    setModifiedSettings((prev) => new Set(prev).add(`fileFiltering.${key}`));
     setShowRestartPrompt(true);
   };
   const updateSetting = <K extends keyof Settings>(
@@ -134,6 +138,7 @@ export function SettingsDialog({
     value: Settings[K],
   ) => {
     setPendingSettings((prev) => ({ ...prev, [key]: value }));
+    setModifiedSettings((prev) => new Set(prev).add(key as string));
     setShowRestartPrompt(true);
   };
 
@@ -300,14 +305,17 @@ export function SettingsDialog({
   ];
 
   // Scope selector items
-  const scopeItems = [
-    { label: SCOPE_LABELS[SettingScope.User], value: SettingScope.User },
-    {
-      label: SCOPE_LABELS[SettingScope.Workspace],
-      value: SettingScope.Workspace,
-    },
-    { label: SCOPE_LABELS[SettingScope.System], value: SettingScope.System },
-  ];
+  const scopeItems = getScopeItems();
+
+  // Scope handling functions (similar to ThemeDialog)
+  const handleScopeHighlight = (scope: SettingScope) => {
+    setSelectedScope(scope);
+  };
+
+  const handleScopeSelect = (scope: SettingScope) => {
+    handleScopeHighlight(scope);
+    setFocusSection('settings'); // Reset focus to settings section
+  };
 
   // Scroll logic for settings
   const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
@@ -315,6 +323,9 @@ export function SettingsDialog({
   const showScrollDown = scrollOffset + maxItemsToShow < items.length;
 
   useInput((input, key) => {
+    if (key.tab) {
+      setFocusSection((prev) => (prev === 'settings' ? 'scope' : 'settings'));
+    }
     if (focusSection === 'settings') {
       if (key.upArrow || input === 'k') {
         if (activeSettingIndex > 0) {
@@ -332,32 +343,72 @@ export function SettingsDialog({
         }
       } else if (key.return || input === ' ') {
         visibleItems[activeSettingIndex - scrollOffset]?.toggle();
-      } else if (key.tab) {
-        setFocusSection('scope');
-      }
-    } else if (focusSection === 'scope') {
-      if (key.upArrow || input === 'k') {
-        if (activeScopeIndex > 0) setActiveScopeIndex(activeScopeIndex - 1);
-      } else if (key.downArrow || input === 'j') {
-        if (activeScopeIndex < scopeItems.length - 1)
-          setActiveScopeIndex(activeScopeIndex + 1);
-      } else if (key.return || input === ' ') {
-        setSelectedScope(scopeItems[activeScopeIndex].value);
-        setFocusSection('settings');
-        setActiveSettingIndex(0);
-        setScrollOffset(0);
-      } else if (key.tab) {
-        setFocusSection('settings');
       }
     }
     if (showRestartPrompt && input === 'r') {
-      // Commit all pending changes to real settings
+      // Commit only modified settings to real settings
       const scope = selectedScope;
       const pending = pendingSettings;
-      // For each key in pending, set value in settings
-      Object.entries(pending).forEach(([key, value]) => {
-        settings.setValue(scope, key as keyof Settings, value);
+
+      // Only save settings that have been modified by the user and are not default values
+      modifiedSettings.forEach((settingKey) => {
+        const [parentKey, childKey] = settingKey.includes('.')
+          ? settingKey.split('.')
+          : [settingKey, undefined];
+
+        if (childKey) {
+          // Nested setting (e.g., accessibility.disableLoadingPhrases)
+          const parentValue = pending[parentKey as keyof Settings];
+          if (parentValue && typeof parentValue === 'object') {
+            const childValue = (parentValue as Record<string, unknown>)[
+              childKey
+            ];
+            if (childValue !== undefined) {
+              // Check if this setting already exists in the original file
+              const originalParent =
+                settings.forScope(scope).settings[parentKey as keyof Settings];
+              const existsInOriginalFile =
+                originalParent &&
+                typeof originalParent === 'object' &&
+                originalParent !== null &&
+                childKey in originalParent;
+
+              // Save if it exists in original file OR if it's not the default value
+              const isDefaultValue = childValue === false;
+              if (existsInOriginalFile || !isDefaultValue) {
+                const currentParent =
+                  settings.forScope(scope).settings[
+                    parentKey as keyof Settings
+                  ];
+                const parentObject =
+                  currentParent && typeof currentParent === 'object'
+                    ? (currentParent as Record<string, unknown>)
+                    : {};
+                settings.setValue(scope, parentKey as keyof Settings, {
+                  ...parentObject,
+                  [childKey]: childValue,
+                });
+              }
+            }
+          }
+        } else {
+          // Top-level setting
+          const value = pending[parentKey as keyof Settings];
+          if (value !== undefined) {
+            // Check if this setting already exists in the original file
+            const existsInOriginalFile =
+              settings.forScope(scope).settings[parentKey as keyof Settings] !==
+              undefined;
+
+            // Save if it exists in original file OR if it's not the default value
+            const isDefaultValue = value === false;
+            if (existsInOriginalFile || !isDefaultValue) {
+              settings.setValue(scope, parentKey as keyof Settings, value);
+            }
+          }
+        }
       });
+
       setShowRestartPrompt(false);
       if (onRestartRequest) onRestartRequest();
     }
@@ -386,6 +437,40 @@ export function SettingsDialog({
           const isActive =
             focusSection === 'settings' &&
             activeSettingIndex === idx + scrollOffset;
+
+          // Check if setting exists in original settings file for this scope
+          const [parentKey, childKey] = item.value.includes('.')
+            ? item.value.split('.')
+            : [item.value, undefined];
+
+          let existsInOriginalFile = false;
+          if (childKey) {
+            // Nested setting
+            const originalParent =
+              settings.forScope(selectedScope).settings[
+                parentKey as keyof Settings
+              ];
+            existsInOriginalFile = !!(
+              originalParent &&
+              typeof originalParent === 'object' &&
+              originalParent !== null &&
+              childKey in originalParent
+            );
+          } else {
+            // Top-level setting
+            existsInOriginalFile =
+              settings.forScope(selectedScope).settings[
+                parentKey as keyof Settings
+              ] !== undefined;
+          }
+
+          // Show value if it exists in original file OR if user modified it in this session
+          const shouldShowValue =
+            existsInOriginalFile || modifiedSettings.has(item.value);
+          const displayValue: string = shouldShowValue
+            ? String(item.checked ?? false)
+            : 'undefined';
+
           return (
             <React.Fragment key={item.value}>
               <Box flexDirection="row" alignItems="center">
@@ -403,7 +488,7 @@ export function SettingsDialog({
                 </Box>
                 <Box minWidth={3} />
                 <Text color={isActive ? Colors.AccentGreen : Colors.Gray}>
-                  {String(item.checked)}
+                  {displayValue}
                 </Text>
               </Box>
               <Box height={1} />
@@ -414,29 +499,19 @@ export function SettingsDialog({
 
         <Box height={1} />
 
-        {/* Apply To Section - Moved to bottom */}
-        <Text color={Colors.AccentBlue}>Apply To</Text>
-        <Box height={1} />
-
-        {/* Display scope items vertically */}
-        <Box flexDirection="column">
-          {scopeItems.map((item, idx) => {
-            const isActive =
-              focusSection === 'scope' && activeScopeIndex === idx;
-            const isSelected = selectedScope === item.value;
-            return (
-              <Box key={item.value} flexDirection="row" alignItems="center">
-                <Box minWidth={2} flexShrink={0}>
-                  <Text color={Colors.AccentGreen}>
-                    {isSelected ? '●' : ''}
-                  </Text>
-                </Box>
-                <Text color={isActive ? Colors.AccentGreen : Colors.Foreground}>
-                  {item.label}
-                </Text>
-              </Box>
-            );
-          })}
+        {/* Apply To Section - Using RadioButtonSelect like ThemeDialog */}
+        <Box marginTop={1} flexDirection="column">
+          <Text bold={focusSection === 'scope'} wrap="truncate">
+            {focusSection === 'scope' ? '> ' : '  '}Apply To
+          </Text>
+          <RadioButtonSelect
+            items={scopeItems}
+            initialIndex={0} // Default to User Settings
+            onSelect={handleScopeSelect}
+            onHighlight={handleScopeHighlight}
+            isFocused={focusSection === 'scope'}
+            showNumbers={focusSection === 'scope'}
+          />
         </Box>
 
         <Box height={1} />
@@ -445,8 +520,8 @@ export function SettingsDialog({
         </Text>
         {showRestartPrompt && (
           <Text color={Colors.AccentYellow}>
-            To see changes, Gemini CLI must be restarted. Press r to restart
-            now.
+            To see changes, Gemini CLI must be restarted. Press r to exit and
+            apply changes now.
           </Text>
         )}
       </Box>

@@ -227,6 +227,9 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     handleThemeHighlight,
   } = useThemeCommand(settings, setThemeError, addItem);
 
+  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
+    useSettingsCommand();
+
   const {
     isAuthDialogOpen,
     openAuthDialog,
@@ -413,8 +416,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     config.setFlashFallbackHandler(flashFallbackHandler);
   }, [config, addItem, userTier]);
 
-  const { isSettingsDialogOpen, openSettingsDialog, closeSettingsDialog } =
-    useSettingsCommand();
   // Terminal and UI setup
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
   const { stdin, setRawMode } = useStdin();
@@ -844,15 +845,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             </Box>
           )}
 
-          {isSettingsDialogOpen ? (
-            <Box flexDirection="column">
-              <SettingsDialog
-                settings={settings}
-                onSelect={() => closeSettingsDialog()}
-                onRestartRequest={() => process.exit(0)}
-              />
-            </Box>
-          ) : shellConfirmationRequest ? (
+          {shellConfirmationRequest ? (
             <ShellConfirmationDialog request={shellConfirmationRequest} />
           ) : isThemeDialogOpen ? (
             <Box flexDirection="column">
@@ -871,6 +864,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     : undefined
                 }
                 terminalWidth={mainAreaWidth}
+              />
+            </Box>
+          ) : isSettingsDialogOpen ? (
+            <Box flexDirection="column">
+              <SettingsDialog
+                settings={settings}
+                onSelect={() => closeSettingsDialog()}
+                onRestartRequest={() => process.exit(0)}
               />
             </Box>
           ) : isAuthenticating ? (
