@@ -47,6 +47,7 @@ import { ClearcutLogger } from '../telemetry/clearcut-logger/clearcut-logger.js'
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { IdeClient } from '../ide/ide-client.js';
+import type { Content } from '@google/genai';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig };
@@ -322,6 +323,12 @@ export class Config {
   }
 
   async refreshAuth(authMethod: AuthType) {
+    // Save the current conversation history before creating a new client
+    let existingHistory: Content[] = [];
+    if (this.geminiClient && this.geminiClient.isInitialized()) {
+      existingHistory = this.geminiClient.getHistory();
+    }
+
     this.contentGeneratorConfig = createContentGeneratorConfig(
       this,
       authMethod,
@@ -329,6 +336,11 @@ export class Config {
 
     this.geminiClient = new GeminiClient(this);
     await this.geminiClient.initialize(this.contentGeneratorConfig);
+
+    // Restore the conversation history to the new client
+    if (existingHistory.length > 0) {
+      this.geminiClient.setHistory(existingHistory);
+    }
 
     // Reset the session flag since we're explicitly changing auth and using default model
     this.inFallbackMode = false;
