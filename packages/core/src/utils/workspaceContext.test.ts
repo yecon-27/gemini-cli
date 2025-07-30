@@ -13,11 +13,12 @@ vi.mock('fs');
 
 describe('WorkspaceContext', () => {
   let workspaceContext: WorkspaceContext;
-  const mockCwd = '/home/user/project';
-  const mockExistingDir = '/home/user/other-project';
-  const mockNonExistentDir = '/home/user/does-not-exist';
-  const mockSymlinkDir = '/home/user/symlink';
-  const mockRealPath = '/home/user/real-directory';
+  // Use path module to create platform-agnostic paths
+  const mockCwd = path.resolve(path.sep, 'home', 'user', 'project');
+  const mockExistingDir = path.resolve(path.sep, 'home', 'user', 'other-project');
+  const mockNonExistentDir = path.resolve(path.sep, 'home', 'user', 'does-not-exist');
+  const mockSymlinkDir = path.resolve(path.sep, 'home', 'user', 'symlink');
+  const mockRealPath = path.resolve(path.sep, 'home', 'user', 'real-directory');
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -63,7 +64,7 @@ describe('WorkspaceContext', () => {
     });
 
     it('should validate and resolve directories to absolute paths', () => {
-      const absolutePath = '/home/user/project/subdir';
+      const absolutePath = path.join(mockCwd, 'subdir');
       vi.mocked(fs.existsSync).mockImplementation(
         (p) => p === mockCwd || p === absolutePath,
       );
@@ -134,21 +135,21 @@ describe('WorkspaceContext', () => {
     });
 
     it('should accept paths within workspace directories', () => {
-      const validPath1 = '/home/user/project/src/file.ts';
-      const validPath2 = '/home/user/other-project/lib/module.js';
+      const validPath1 = path.join(mockCwd, 'src', 'file.ts');
+      const validPath2 = path.join(mockExistingDir, 'lib', 'module.js');
 
       expect(workspaceContext.isPathWithinWorkspace(validPath1)).toBe(true);
       expect(workspaceContext.isPathWithinWorkspace(validPath2)).toBe(true);
     });
 
     it('should reject paths outside workspace', () => {
-      const invalidPath = '/home/user/outside-workspace/file.txt';
+      const invalidPath = path.resolve(path.dirname(mockCwd), 'outside-workspace', 'file.txt');
       expect(workspaceContext.isPathWithinWorkspace(invalidPath)).toBe(false);
     });
 
     it('should resolve symbolic links before validation', () => {
-      const symlinkPath = '/home/user/project/symlink-file';
-      const realPath = '/home/user/project/real-file';
+      const symlinkPath = path.join(mockCwd, 'symlink-file');
+      const realPath = path.join(mockCwd, 'real-file');
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.realpathSync).mockImplementation((p) => {
@@ -162,20 +163,20 @@ describe('WorkspaceContext', () => {
     });
 
     it('should handle nested directories correctly', () => {
-      const nestedPath = '/home/user/project/deeply/nested/path/file.txt';
+      const nestedPath = path.join(mockCwd, 'deeply', 'nested', 'path', 'file.txt');
       expect(workspaceContext.isPathWithinWorkspace(nestedPath)).toBe(true);
     });
 
     it('should handle edge cases (root, parent references)', () => {
       const rootPath = '/';
-      const parentPath = '/home/user';
+      const parentPath = path.dirname(mockCwd);
 
       expect(workspaceContext.isPathWithinWorkspace(rootPath)).toBe(false);
       expect(workspaceContext.isPathWithinWorkspace(parentPath)).toBe(false);
     });
 
     it('should handle non-existent paths correctly', () => {
-      const nonExistentPath = '/home/user/project/does-not-exist.txt';
+      const nonExistentPath = path.join(mockCwd, 'does-not-exist.txt');
       vi.mocked(fs.existsSync).mockImplementation((p) => p !== nonExistentPath);
 
       // Should still validate based on path structure
@@ -202,8 +203,8 @@ describe('WorkspaceContext', () => {
     });
 
     it('should follow symlinks but validate resolved path', () => {
-      const symlinkInsideWorkspace = '/home/user/project/link-to-subdir';
-      const resolvedInsideWorkspace = '/home/user/project/subdir';
+      const symlinkInsideWorkspace = path.join(mockCwd, 'link-to-subdir');
+      const resolvedInsideWorkspace = path.join(mockCwd, 'subdir');
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.realpathSync).mockImplementation((p) => {
@@ -248,7 +249,7 @@ describe('WorkspaceContext', () => {
     });
 
     it('should handle circular symlinks', () => {
-      const circularLink = '/home/user/project/circular';
+      const circularLink = path.join(mockCwd, 'circular');
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.realpathSync).mockImplementation(() => {
