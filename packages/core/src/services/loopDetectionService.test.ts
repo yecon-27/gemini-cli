@@ -4,15 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { GenerateContentResponse } from '@google/genai';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
-import {
-  GeminiEventType,
-  ServerGeminiContentEvent,
-  ServerGeminiStreamEvent,
-  ServerGeminiToolCallRequestEvent,
-} from '../core/turn.js';
 import * as loggers from '../telemetry/loggers.js';
 import { LoopType } from '../telemetry/types.js';
 import { LoopDetectionService } from './loopDetectionService.js';
@@ -40,21 +35,40 @@ describe('LoopDetectionService', () => {
   const createToolCallRequestEvent = (
     name: string,
     args: Record<string, unknown>,
-  ): ServerGeminiToolCallRequestEvent => ({
-    type: GeminiEventType.ToolCallRequest,
-    value: {
-      name,
-      args,
-      callId: 'test-id',
-      isClientInitiated: false,
-      prompt_id: 'test-prompt-id',
-    },
-  });
+  ): GenerateContentResponse =>
+    ({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                functionCall: {
+                  name,
+                  args,
+                },
+              },
+            ],
+            role: 'model',
+          },
+        },
+      ],
+    }) as unknown as GenerateContentResponse;
 
-  const createContentEvent = (content: string): ServerGeminiContentEvent => ({
-    type: GeminiEventType.Content,
-    value: content,
-  });
+  const createContentEvent = (text: string): GenerateContentResponse =>
+    ({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text,
+              },
+            ],
+            role: 'model',
+          },
+        },
+      ],
+    }) as unknown as GenerateContentResponse;
 
   describe('Tool Call Loop Detection', () => {
     it(`should not detect a loop for fewer than TOOL_CALL_LOOP_THRESHOLD identical calls`, () => {
@@ -106,8 +120,19 @@ describe('LoopDetectionService', () => {
         param: 'value',
       });
       const otherEvent = {
-        type: 'thought',
-      } as unknown as ServerGeminiStreamEvent;
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  thought: 'thinking',
+                },
+              ],
+              role: 'model',
+            },
+          },
+        ],
+      } as unknown as GenerateContentResponse;
 
       // Send events just below the threshold
       for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD - 1; i++) {
@@ -209,8 +234,8 @@ describe('LoopDetectionService', () => {
   describe('General Behavior', () => {
     it('should return false for unhandled event types', () => {
       const otherEvent = {
-        type: 'unhandled_event',
-      } as unknown as ServerGeminiStreamEvent;
+        candidates: [],
+      } as unknown as GenerateContentResponse;
       expect(service.addAndCheck(otherEvent)).toBe(false);
       expect(service.addAndCheck(otherEvent)).toBe(false);
     });

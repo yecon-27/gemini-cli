@@ -242,6 +242,10 @@ export class Turn {
         }
       }
     } catch (e) {
+      if (e instanceof Error && e.name === 'LoopDetectedError') {
+        yield { type: GeminiEventType.LoopDetected };
+        return;
+      }
       const error = toFriendlyError(e);
       if (error instanceof UnauthorizedError) {
         throw error;
