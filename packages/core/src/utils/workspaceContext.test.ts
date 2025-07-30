@@ -15,8 +15,18 @@ describe('WorkspaceContext', () => {
   let workspaceContext: WorkspaceContext;
   // Use path module to create platform-agnostic paths
   const mockCwd = path.resolve(path.sep, 'home', 'user', 'project');
-  const mockExistingDir = path.resolve(path.sep, 'home', 'user', 'other-project');
-  const mockNonExistentDir = path.resolve(path.sep, 'home', 'user', 'does-not-exist');
+  const mockExistingDir = path.resolve(
+    path.sep,
+    'home',
+    'user',
+    'other-project',
+  );
+  const mockNonExistentDir = path.resolve(
+    path.sep,
+    'home',
+    'user',
+    'does-not-exist',
+  );
   const mockSymlinkDir = path.resolve(path.sep, 'home', 'user', 'symlink');
   const mockRealPath = path.resolve(path.sep, 'home', 'user', 'real-directory');
 
@@ -143,7 +153,11 @@ describe('WorkspaceContext', () => {
     });
 
     it('should reject paths outside workspace', () => {
-      const invalidPath = path.resolve(path.dirname(mockCwd), 'outside-workspace', 'file.txt');
+      const invalidPath = path.resolve(
+        path.dirname(mockCwd),
+        'outside-workspace',
+        'file.txt',
+      );
       expect(workspaceContext.isPathWithinWorkspace(invalidPath)).toBe(false);
     });
 
@@ -163,7 +177,13 @@ describe('WorkspaceContext', () => {
     });
 
     it('should handle nested directories correctly', () => {
-      const nestedPath = path.join(mockCwd, 'deeply', 'nested', 'path', 'file.txt');
+      const nestedPath = path.join(
+        mockCwd,
+        'deeply',
+        'nested',
+        'path',
+        'file.txt',
+      );
       expect(workspaceContext.isPathWithinWorkspace(nestedPath)).toBe(true);
     });
 
