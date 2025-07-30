@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as fs from 'fs';
+import * as path from 'path';
 import { WorkspaceContext } from './workspaceContext.js';
 
 vi.mock('fs');
@@ -218,17 +219,31 @@ describe('WorkspaceContext', () => {
     });
 
     it('should prevent sandbox escape via symlinks', () => {
-      const symlinkEscape = '/home/user/project/escape-link';
-      const resolvedOutside = '/etc/passwd';
+      const symlinkEscape = path.join(mockCwd, 'escape-link');
+      const resolvedOutside = path.resolve(mockCwd, '..', 'outside-file');
 
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const pathStr = p.toString();
+        return (
+          pathStr === symlinkEscape ||
+          pathStr === resolvedOutside ||
+          pathStr === mockCwd
+        );
+      });
       vi.mocked(fs.realpathSync).mockImplementation((p) => {
-        if (p === symlinkEscape) {
+        if (p.toString() === symlinkEscape) {
           return resolvedOutside;
         }
         return p.toString();
       });
+      vi.mocked(fs.statSync).mockImplementation(
+        (p) =>
+          ({
+            isDirectory: () => p.toString() !== resolvedOutside,
+          }) as fs.Stats,
+      );
 
+      workspaceContext = new WorkspaceContext(mockCwd);
       expect(workspaceContext.isPathWithinWorkspace(symlinkEscape)).toBe(false);
     });
 

@@ -8,6 +8,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'fs';
+import path from 'path';
 
 vi.mock('fs', () => ({
   default: {
@@ -427,20 +428,20 @@ describe('LSTool', () => {
   describe('getDescription', () => {
     it('should return shortened relative path', () => {
       const params = {
-        path: '/home/user/project/deeply/nested/directory',
+        path: path.join(mockPrimaryDir, 'deeply', 'nested', 'directory'),
       };
 
       const description = lsTool.getDescription(params);
-      expect(description).toBe('deeply/nested/directory');
+      expect(description).toBe(path.join('deeply', 'nested', 'directory'));
     });
 
     it('should handle paths in secondary workspace', () => {
       const params = {
-        path: '/home/user/other-project/lib',
+        path: path.join(mockSecondaryDir, 'lib'),
       };
 
       const description = lsTool.getDescription(params);
-      expect(description).toBe('../other-project/lib');
+      expect(description).toBe(path.join('..', 'other-project', 'lib'));
     });
   });
 
