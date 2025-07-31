@@ -22,6 +22,7 @@ import {
   ChatCompressionInfo,
 } from './turn.js';
 import { Config } from '../config/config.js';
+import { UserTierId } from '../code_assist/types.js';
 import { getCoreSystemPrompt, getCompressionPrompt } from './prompts.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { getResponseText } from '../utils/generateContentResponseUtilities.js';
@@ -30,6 +31,7 @@ import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { tokenLimit } from './tokenLimits.js';
 import {
   AuthType,
@@ -39,6 +41,10 @@ import {
 } from './contentGenerator.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { ideContext } from '../ide/ideContext.js';
+import { logNextSpeakerCheck } from '../telemetry/loggers.js';
+import { NextSpeakerCheckEvent } from '../telemetry/types.js';
 
 function isThinkingSupported(model: string) {
   if (model.startsWith('gemini-2.5')) return true;
@@ -99,12 +105,16 @@ export class GeminiClient {
    */
   private readonly COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 
+  private readonly loopDetector: LoopDetectionService;
+  private lastPromptId?: string;
+
   constructor(private config: Config) {
     if (config.getProxy()) {
       setGlobalDispatcher(new ProxyAgent(config.getProxy() as string));
     }
 
     this.embeddingModel = config.getEmbeddingModel();
+    this.loopDetector = new LoopDetectionService(config);
   }
 
   async initialize(contentGeneratorConfig: ContentGeneratorConfig) {
@@ -123,6 +133,10 @@ export class GeminiClient {
     return this.contentGenerator;
   }
 
+  getUserTier(): UserTierId | undefined {
+    return this.contentGenerator?.userTier;
+  }
+
   async addHistory(content: Content) {
     this.getChat().addHistory(content);
   }
@@ -134,6 +148,10 @@ export class GeminiClient {
     return this.chat;
   }
 
+  isInitialized(): boolean {
+    return this.chat !== undefined && this.contentGenerator !== undefined;
+  }
+
   getHistory(): Content[] {
     return this.getChat().getHistory();
   }
@@ -142,12 +160,47 @@ export class GeminiClient {
     this.getChat().setHistory(history);
   }
 
+  async setTools(): Promise<void> {
+    const toolRegistry = await this.config.getToolRegistry();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    this.getChat().setTools(tools);
+  }
+
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
   }
 
+  async addDirectoryContext(): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: await this.getDirectoryContext() }],
+    });
+  }
+
+  private async getDirectoryContext(): Promise<string> {
+    const workspaceContext = this.config.getWorkspaceContext();
+    const workspaceDirectories = workspaceContext.getDirectories();
+
+    const folderStructures = await Promise.all(
+      workspaceDirectories.map((dir) =>
+        getFolderStructure(dir, {
+          fileService: this.config.getFileService(),
+        }),
+      ),
+    );
+
+    const folderStructure = folderStructures.join('\n');
+    const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
+    const workingDirPreamble = `I'm currently working in the following directories:\n${dirList}\n Folder structures are as follows:\n${folderStructure}`;
+    return workingDirPreamble;
+  }
+
   private async getEnvironment(): Promise<Part[]> {
-    const cwd = this.config.getWorkingDir();
     const today = new Date().toLocaleDateString(undefined, {
       weekday: 'long',
       year: 'numeric',
@@ -155,14 +208,36 @@ export class GeminiClient {
       day: 'numeric',
     });
     const platform = process.platform;
-    const folderStructure = await getFolderStructure(cwd, {
-      fileService: this.config.getFileService(),
-    });
+
+    const workspaceContext = this.config.getWorkspaceContext();
+    const workspaceDirectories = workspaceContext.getDirectories();
+
+    const folderStructures = await Promise.all(
+      workspaceDirectories.map((dir) =>
+        getFolderStructure(dir, {
+          fileService: this.config.getFileService(),
+        }),
+      ),
+    );
+
+    const folderStructure = folderStructures.join('\n');
+
+    let workingDirPreamble: string;
+    if (workspaceDirectories.length === 1) {
+      workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
+    } else {
+      const dirList = workspaceDirectories
+        .map((dir) => `  - ${dir}`)
+        .join('\n');
+      workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
+    }
+
     const context = `
   This is the Gemini CLI. We are setting up the context for our chat.
   Today's date is ${today}.
   My operating system is: ${platform}
-  I'm currently working in the directory: ${cwd}
+  ${workingDirPreamble}
+  Here is the folder structure of the current working directories:\n
   ${folderStructure}
           `.trim();
 
@@ -210,7 +285,7 @@ export class GeminiClient {
     return initialParts;
   }
 
-  private async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
+  async startChat(extraHistory?: Content[]): Promise<GeminiChat> {
     const envParts = await this.getEnvironment();
     const toolRegistry = await this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
@@ -267,6 +342,10 @@ export class GeminiClient {
     turns: number = this.MAX_TURNS,
     originalModel?: string,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    if (this.lastPromptId !== prompt_id) {
+      this.loopDetector.reset(prompt_id);
+      this.lastPromptId = prompt_id;
+    }
     this.sessionTurnCount++;
     if (
       this.config.getMaxSessionTurns() > 0 &&
@@ -289,9 +368,67 @@ export class GeminiClient {
     if (compressed) {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
+
+    if (this.config.getIdeModeFeature() && this.config.getIdeMode()) {
+      const ideContextState = ideContext.getIdeContext();
+      const openFiles = ideContextState?.workspaceState?.openFiles;
+
+      if (openFiles && openFiles.length > 0) {
+        const contextParts: string[] = [];
+        const firstFile = openFiles[0];
+        const activeFile = firstFile.isActive ? firstFile : undefined;
+
+        if (activeFile) {
+          contextParts.push(
+            `This is the file that the user is looking at:\n- Path: ${activeFile.path}`,
+          );
+          if (activeFile.cursor) {
+            contextParts.push(
+              `This is the cursor position in the file:\n- Cursor Position: Line ${activeFile.cursor.line}, Character ${activeFile.cursor.character}`,
+            );
+          }
+          if (activeFile.selectedText) {
+            contextParts.push(
+              `This is the selected text in the file:\n- ${activeFile.selectedText}`,
+            );
+          }
+        }
+
+        const otherOpenFiles = activeFile ? openFiles.slice(1) : openFiles;
+
+        if (otherOpenFiles.length > 0) {
+          const recentFiles = otherOpenFiles
+            .map((file) => `- ${file.path}`)
+            .join('\n');
+          const heading = activeFile
+            ? `Here are some other files the user has open, with the most recent at the top:`
+            : `Here are some files the user has open, with the most recent at the top:`;
+          contextParts.push(`${heading}\n${recentFiles}`);
+        }
+
+        if (contextParts.length > 0) {
+          request = [
+            { text: contextParts.join('\n') },
+            ...(Array.isArray(request) ? request : [request]),
+          ];
+        }
+      }
+    }
+
     const turn = new Turn(this.getChat(), prompt_id);
+
+    const loopDetected = await this.loopDetector.turnStarted(signal);
+    if (loopDetected) {
+      yield { type: GeminiEventType.LoopDetected };
+      return turn;
+    }
+
     const resultStream = turn.run(request, signal);
     for await (const event of resultStream) {
+      if (this.loopDetector.addAndCheck(event)) {
+        yield { type: GeminiEventType.LoopDetected };
+        return turn;
+      }
       yield event;
     }
     if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
@@ -307,6 +444,14 @@ export class GeminiClient {
         this.getChat(),
         this,
         signal,
+      );
+      logNextSpeakerCheck(
+        this.config,
+        new NextSpeakerCheckEvent(
+          prompt_id,
+          turn.finishReason?.toString() || '',
+          nextSpeakerCheck?.next_speaker || '',
+        ),
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
         const nextRequest = [{ text: 'Please continue.' }];
@@ -543,7 +688,8 @@ export class GeminiClient {
     // Find the first user message after the index. This is the start of the next turn.
     while (
       compressBeforeIndex < curatedHistory.length &&
-      curatedHistory[compressBeforeIndex]?.role !== 'user'
+      (curatedHistory[compressBeforeIndex]?.role === 'model' ||
+        isFunctionResponse(curatedHistory[compressBeforeIndex]))
     ) {
       compressBeforeIndex++;
     }
@@ -594,8 +740,8 @@ export class GeminiClient {
   }
 
   /**
-   * Handles fallback to Flash model when persistent 429 errors occur for OAuth users.
-   * Uses a fallback handler if provided by the config, otherwise returns null.
+   * Handles falling back to Flash model when persistent 429 errors occur for OAuth users.
+   * Uses a fallback handler if provided by the config; otherwise, returns null.
    */
   private async handleFlashFallback(
     authType?: string,
@@ -625,6 +771,7 @@ export class GeminiClient {
         );
         if (accepted !== false && accepted !== null) {
           this.config.setModel(fallbackModel);
+          this.config.setFallbackMode(true);
           return fallbackModel;
         }
         // Check if the model was switched manually in the handler
