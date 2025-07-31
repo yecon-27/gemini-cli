@@ -77,9 +77,6 @@ export function allowEditorTypeInSandbox(editor: EditorType): boolean {
     return notUsingSandbox;
   }
   // For terminal-based editors like vim and emacs, allow in sandbox.
-  if (['vim', 'emacs'].includes(editor)) {
-    return true;
-  }
   return true;
 }
 
