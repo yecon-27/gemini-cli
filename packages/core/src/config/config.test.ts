@@ -214,7 +214,9 @@ describe('Server Config (config.ts)', () => {
       expect(mockNewClient.initialize).toHaveBeenCalledWith(mockContentConfig);
 
       // Verify that history was restored to the new client
-      expect(mockNewClient.setHistory).toHaveBeenCalledWith(mockExistingHistory);
+      expect(mockNewClient.setHistory).toHaveBeenCalledWith(
+        mockExistingHistory,
+      );
     });
 
     it('should handle case when no existing client is initialized', async () => {
