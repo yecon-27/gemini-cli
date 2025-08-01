@@ -418,14 +418,14 @@ export function handleVimAction(
 
     case 'vim_delete_to_end_of_line': {
       const currentLine = lines[cursorRow] || '';
-      if (cursorCol < currentLine.length) {
+      if (cursorCol < cpLen(currentLine)) {
         const nextState = pushUndo(state);
         return replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
           cursorRow,
-          currentLine.length,
+          cpLen(currentLine),
           '',
         );
       }
@@ -434,14 +434,14 @@ export function handleVimAction(
 
     case 'vim_change_to_end_of_line': {
       const currentLine = lines[cursorRow] || '';
-      if (cursorCol < currentLine.length) {
+      if (cursorCol < cpLen(currentLine)) {
         const nextState = pushUndo(state);
         return replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
           cursorRow,
-          currentLine.length,
+          cpLen(currentLine),
           '',
         );
       }
@@ -689,7 +689,7 @@ export function handleVimAction(
             const currentLine = lines[cursorRow] || '';
 
             // If findNextWordStart moved us past the current line but didn't find a word
-            if (startRow === cursorRow && startCol >= currentLine.length) {
+            if (startRow === cursorRow && startCol >= cpLen(currentLine)) {
               const nextPosition = findNextWordAcrossLines(
                 getText,
                 lines,
@@ -770,11 +770,12 @@ export function handleVimAction(
         // Special handling for the first iteration when we're at end of word
         if (i === 0) {
           const currentLine = lines[cursorRow] || '';
+          const lineCodePoints = [...currentLine];
           const atEndOfWord =
-            cursorCol < currentLine.length &&
-            /\w/.test(currentLine[cursorCol]) &&
-            (cursorCol + 1 >= currentLine.length ||
-              !/\w/.test(currentLine[cursorCol + 1]));
+            cursorCol < lineCodePoints.length &&
+            /\w/.test(lineCodePoints[cursorCol]) &&
+            (cursorCol + 1 >= lineCodePoints.length ||
+              !/\w/.test(lineCodePoints[cursorCol + 1]));
 
           if (atEndOfWord) {
             // Check if findWordEnd found a word on a subsequent line
@@ -791,7 +792,7 @@ export function handleVimAction(
             }
 
             // If findWordEnd didn't find a word (moved to newline), look for next non-empty line
-            if (startRow === cursorRow && startCol >= currentLine.length) {
+            if (startRow === cursorRow && startCol >= cpLen(currentLine)) {
               const nextPosition = findNextWordAcrossLines(
                 getText,
                 lines,
