@@ -64,7 +64,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const highlightRanges = useMemo(() => {
     const ranges: Array<{ start: number; end: number }> = [];
     // Regex to find words starting with @ or / that are preceded by whitespace or start of string.
-    const regex = /(?<=^|\s)[@/][^\s]*/g;
+    const regex = /(?<=^|\s)[@/](?:\\ |\S)*/g;
     let match;
     while ((match = regex.exec(buffer.text)) !== null) {
       ranges.push({
