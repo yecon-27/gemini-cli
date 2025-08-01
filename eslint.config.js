@@ -34,6 +34,7 @@ export default tseslint.config(
       'packages/server/dist/**',
       'packages/vscode-ide-companion/dist/**',
       'bundle/**',
+      '**/.integration-tests/**/mcp-server.cjs',
     ],
   },
   eslint.configs.recommended,
