@@ -478,7 +478,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
               const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
-              let display = cpSlice(lineText, 0, inputWidth);
+              let display = lineText;
               const currentVisualWidth = stringWidth(display);
               if (currentVisualWidth < inputWidth) {
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
