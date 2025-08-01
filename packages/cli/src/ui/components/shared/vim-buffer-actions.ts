@@ -7,56 +7,20 @@
 import {
   TextBufferState,
   TextBufferAction,
-  findNextWordStart,
-  findPrevWordStart,
-  findWordEnd,
-  getOffsetFromPosition,
-  getPositionFromOffsets,
   getLineRangeOffsets,
+  getPositionFromOffsets,
   replaceRangeInternal,
   pushUndo,
+  isWordCharStrict,
+  findNextWordAcrossLines,
+  findPrevWordAcrossLines,
+  findNextWordStartInLine,
+  findPrevWordStartInLine,
+  findWordEndInLine,
+  isWhitespace,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
 
-// Helper function to handle word movement across empty lines.
-function findNextWordAcrossLines(
-  getText: () => string,
-  lines: string[],
-  cursorRow: number,
-  searchForWordStart: boolean,
-): { row: number; col: number } | null {
-  // Look for next line with content
-  let nextLineWithContent = -1;
-  for (let lineIdx = cursorRow + 1; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx] || '';
-    if (line.trim().length > 0) {
-      nextLineWithContent = lineIdx;
-      break;
-    }
-  }
-
-  if (nextLineWithContent !== -1) {
-    // Move to the word on that line
-    const nextLineOffset = getOffsetFromPosition(nextLineWithContent, 0, lines);
-    const wordOffset = searchForWordStart
-      ? findNextWordStart(getText(), nextLineOffset)
-      : findWordEnd(getText(), nextLineOffset);
-
-    const { startRow, startCol } = getPositionFromOffsets(
-      wordOffset,
-      wordOffset,
-      lines,
-    );
-    return { row: startRow, col: startCol };
-  } else {
-    // No more lines with content, move to next line (could be empty)
-    if (cursorRow < lines.length - 1) {
-      return { row: cursorRow + 1, col: 0 };
-    }
-  }
-
-  return null;
-}
 
 export type VimAction = Extract<
   TextBufferAction,
@@ -99,42 +63,37 @@ export function handleVimAction(
   action: VimAction,
 ): TextBufferState {
   const { lines, cursorRow, cursorCol } = state;
-  // Cache text join to avoid repeated calculations for word operations
-  let text: string | null = null;
-  const getText = () => text ?? (text = lines.join('\n'));
 
   switch (action.type) {
     case 'vim_delete_word_forward': {
       const { count } = action.payload;
-      const currentOffset = getOffsetFromPosition(cursorRow, cursorCol, lines);
-
-      let endOffset = currentOffset;
-      let searchOffset = currentOffset;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        const nextWordOffset = findNextWordStart(getText(), searchOffset);
-        if (nextWordOffset > searchOffset) {
-          searchOffset = nextWordOffset;
-          endOffset = nextWordOffset;
+        const nextWord = findNextWordAcrossLines(lines, endRow, endCol, true);
+        if (nextWord) {
+          endRow = nextWord.row;
+          endCol = nextWord.col;
         } else {
-          // If no next word, delete to end of current word
-          const wordEndOffset = findWordEnd(getText(), searchOffset);
-          endOffset = Math.min(wordEndOffset + 1, getText().length);
+          // No more words, delete to end of current word or line
+          const currentLine = lines[endRow] || '';
+          const wordEnd = findWordEndInLine(currentLine, endCol);
+          if (wordEnd !== null) {
+            endCol = wordEnd + 1; // Include the character at word end
+          } else {
+            endCol = cpLen(currentLine);
+          }
           break;
         }
       }
 
-      if (endOffset > currentOffset) {
+      if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = pushUndo(state);
-        const { startRow, startCol, endRow, endCol } = getPositionFromOffsets(
-          currentOffset,
-          endOffset,
-          nextState.lines,
-        );
         return replaceRangeInternal(
           nextState,
-          startRow,
-          startCol,
+          cursorRow,
+          cursorCol,
           endRow,
           endCol,
           '',
@@ -145,61 +104,52 @@ export function handleVimAction(
 
     case 'vim_delete_word_backward': {
       const { count } = action.payload;
-      const currentOffset = getOffsetFromPosition(cursorRow, cursorCol, lines);
-
-      let startOffset = currentOffset;
-      let searchOffset = currentOffset;
+      let startRow = cursorRow;
+      let startCol = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        const prevWordOffset = findPrevWordStart(getText(), searchOffset);
-        if (prevWordOffset < searchOffset) {
-          searchOffset = prevWordOffset;
-          startOffset = prevWordOffset;
+        const prevWord = findPrevWordAcrossLines(lines, startRow, startCol);
+        if (prevWord) {
+          startRow = prevWord.row;
+          startCol = prevWord.col;
         } else {
           break;
         }
       }
 
-      if (startOffset < currentOffset) {
+      if (startRow !== cursorRow || startCol !== cursorCol) {
         const nextState = pushUndo(state);
-        const { startRow, startCol, endRow, endCol } = getPositionFromOffsets(
-          startOffset,
-          currentOffset,
-          nextState.lines,
-        );
-        const newState = replaceRangeInternal(
+        return replaceRangeInternal(
           nextState,
           startRow,
           startCol,
-          endRow,
-          endCol,
+          cursorRow,
+          cursorCol,
           '',
         );
-        // Cursor is already at the correct position after deletion
-        return newState;
       }
       return state;
     }
 
     case 'vim_delete_word_end': {
       const { count } = action.payload;
-      const currentOffset = getOffsetFromPosition(cursorRow, cursorCol, lines);
-
-      let offset = currentOffset;
-      let endOffset = currentOffset;
+      let row = cursorRow;
+      let col = cursorCol;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        const wordEndOffset = findWordEnd(getText(), offset);
-        if (wordEndOffset >= offset) {
-          endOffset = wordEndOffset + 1; // Include the character at word end
+        const wordEnd = findNextWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          endRow = wordEnd.row;
+          endCol = wordEnd.col + 1; // Include the character at word end
           // For next iteration, move to start of next word
           if (i < count - 1) {
-            const nextWordStart = findNextWordStart(
-              getText(),
-              wordEndOffset + 1,
-            );
-            offset = nextWordStart;
-            if (nextWordStart <= wordEndOffset) {
+            const nextWord = findNextWordAcrossLines(lines, wordEnd.row, wordEnd.col + 1, true);
+            if (nextWord) {
+              row = nextWord.row;
+              col = nextWord.col;
+            } else {
               break; // No more words
             }
           }
@@ -208,19 +158,18 @@ export function handleVimAction(
         }
       }
 
-      endOffset = Math.min(endOffset, getText().length);
+      // Ensure we don't go past the end of the last line
+      if (endRow < lines.length) {
+        const lineLen = cpLen(lines[endRow] || '');
+        endCol = Math.min(endCol, lineLen);
+      }
 
-      if (endOffset > currentOffset) {
+      if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = pushUndo(state);
-        const { startRow, startCol, endRow, endCol } = getPositionFromOffsets(
-          currentOffset,
-          endOffset,
-          nextState.lines,
-        );
         return replaceRangeInternal(
           nextState,
-          startRow,
-          startCol,
+          cursorRow,
+          cursorCol,
           endRow,
           endCol,
           '',
@@ -231,35 +180,33 @@ export function handleVimAction(
 
     case 'vim_change_word_forward': {
       const { count } = action.payload;
-      const currentOffset = getOffsetFromPosition(cursorRow, cursorCol, lines);
-
-      let searchOffset = currentOffset;
-      let endOffset = currentOffset;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        const nextWordOffset = findNextWordStart(getText(), searchOffset);
-        if (nextWordOffset > searchOffset) {
-          searchOffset = nextWordOffset;
-          endOffset = nextWordOffset;
+        const nextWord = findNextWordAcrossLines(lines, endRow, endCol, true);
+        if (nextWord) {
+          endRow = nextWord.row;
+          endCol = nextWord.col;
         } else {
-          // If no next word, change to end of current word
-          const wordEndOffset = findWordEnd(getText(), searchOffset);
-          endOffset = Math.min(wordEndOffset + 1, getText().length);
+          // No more words, change to end of current word or line
+          const currentLine = lines[endRow] || '';
+          const wordEnd = findWordEndInLine(currentLine, endCol);
+          if (wordEnd !== null) {
+            endCol = wordEnd + 1; // Include the character at word end
+          } else {
+            endCol = cpLen(currentLine);
+          }
           break;
         }
       }
 
-      if (endOffset > currentOffset) {
+      if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = pushUndo(state);
-        const { startRow, startCol, endRow, endCol } = getPositionFromOffsets(
-          currentOffset,
-          endOffset,
-          nextState.lines,
-        );
         return replaceRangeInternal(
           nextState,
-          startRow,
-          startCol,
+          cursorRow,
+          cursorCol,
           endRow,
           endCol,
           '',
@@ -270,34 +217,27 @@ export function handleVimAction(
 
     case 'vim_change_word_backward': {
       const { count } = action.payload;
-      const currentOffset = getOffsetFromPosition(cursorRow, cursorCol, lines);
-
-      let startOffset = currentOffset;
-      let searchOffset = currentOffset;
+      let startRow = cursorRow;
+      let startCol = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        const prevWordOffset = findPrevWordStart(getText(), searchOffset);
-        if (prevWordOffset < searchOffset) {
-          searchOffset = prevWordOffset;
-          startOffset = prevWordOffset;
+        const prevWord = findPrevWordAcrossLines(lines, startRow, startCol);
+        if (prevWord) {
+          startRow = prevWord.row;
+          startCol = prevWord.col;
         } else {
           break;
         }
       }
 
-      if (startOffset < currentOffset) {
+      if (startRow !== cursorRow || startCol !== cursorCol) {
         const nextState = pushUndo(state);
-        const { startRow, startCol, endRow, endCol } = getPositionFromOffsets(
-          startOffset,
-          currentOffset,
-          nextState.lines,
-        );
         return replaceRangeInternal(
           nextState,
           startRow,
           startCol,
-          endRow,
-          endCol,
+          cursorRow,
+          cursorCol,
           '',
         );
       }
@@ -306,23 +246,23 @@ export function handleVimAction(
 
     case 'vim_change_word_end': {
       const { count } = action.payload;
-      const currentOffset = getOffsetFromPosition(cursorRow, cursorCol, lines);
-
-      let offset = currentOffset;
-      let endOffset = currentOffset;
+      let row = cursorRow;
+      let col = cursorCol;
+      let endRow = cursorRow;
+      let endCol = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        const wordEndOffset = findWordEnd(getText(), offset);
-        if (wordEndOffset >= offset) {
-          endOffset = wordEndOffset + 1; // Include the character at word end
+        const wordEnd = findNextWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          endRow = wordEnd.row;
+          endCol = wordEnd.col + 1; // Include the character at word end
           // For next iteration, move to start of next word
           if (i < count - 1) {
-            const nextWordStart = findNextWordStart(
-              getText(),
-              wordEndOffset + 1,
-            );
-            offset = nextWordStart;
-            if (nextWordStart <= wordEndOffset) {
+            const nextWord = findNextWordAcrossLines(lines, wordEnd.row, wordEnd.col + 1, true);
+            if (nextWord) {
+              row = nextWord.row;
+              col = nextWord.col;
+            } else {
               break; // No more words
             }
           }
@@ -331,19 +271,18 @@ export function handleVimAction(
         }
       }
 
-      endOffset = Math.min(endOffset, getText().length);
+      // Ensure we don't go past the end of the last line
+      if (endRow < lines.length) {
+        const lineLen = cpLen(lines[endRow] || '');
+        endCol = Math.min(endCol, lineLen);
+      }
 
-      if (endOffset !== currentOffset) {
+      if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = pushUndo(state);
-        const { startRow, startCol, endRow, endCol } = getPositionFromOffsets(
-          Math.min(currentOffset, endOffset),
-          Math.max(currentOffset, endOffset),
-          nextState.lines,
-        );
         return replaceRangeInternal(
           nextState,
-          startRow,
-          startCol,
+          cursorRow,
+          cursorCol,
           endRow,
           endCol,
           '',
@@ -673,168 +612,90 @@ export function handleVimAction(
 
     case 'vim_move_word_forward': {
       const { count } = action.payload;
-      let offset = getOffsetFromPosition(cursorRow, cursorCol, lines);
+      let row = cursorRow;
+      let col = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        const nextWordOffset = findNextWordStart(getText(), offset);
-
-        if (nextWordOffset > offset) {
-          // Check if we need special handling for moving across lines
-          if (i === 0) {
-            const { startRow, startCol } = getPositionFromOffsets(
-              nextWordOffset,
-              nextWordOffset,
-              lines,
-            );
-            const currentLine = lines[cursorRow] || '';
-
-            // If findNextWordStart moved us past the current line but didn't find a word
-            if (startRow === cursorRow && startCol >= cpLen(currentLine)) {
-              const nextPosition = findNextWordAcrossLines(
-                getText,
-                lines,
-                cursorRow,
-                true, // searchForWordStart
-              );
-
-              if (nextPosition) {
-                if (nextPosition.row !== cursorRow) {
-                  // We found a position on a different line, return it directly
-                  return {
-                    ...state,
-                    cursorRow: nextPosition.row,
-                    cursorCol: nextPosition.col,
-                    preferredCol: null,
-                  };
-                } else {
-                  // Continue with the found offset
-                  offset = getOffsetFromPosition(
-                    nextPosition.row,
-                    nextPosition.col,
-                    lines,
-                  );
-                  continue;
-                }
-              }
-            }
-          }
-
-          offset = nextWordOffset;
+        const nextWord = findNextWordAcrossLines(lines, row, col, true);
+        if (nextWord) {
+          row = nextWord.row;
+          col = nextWord.col;
         } else {
           // No more words to move to
           break;
         }
       }
 
-      const { startRow, startCol } = getPositionFromOffsets(
-        offset,
-        offset,
-        lines,
-      );
       return {
         ...state,
-        cursorRow: startRow,
-        cursorCol: startCol,
+        cursorRow: row,
+        cursorCol: col,
         preferredCol: null,
       };
     }
 
     case 'vim_move_word_backward': {
       const { count } = action.payload;
-      let offset = getOffsetFromPosition(cursorRow, cursorCol, lines);
+      let row = cursorRow;
+      let col = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        offset = findPrevWordStart(getText(), offset);
+        const prevWord = findPrevWordAcrossLines(lines, row, col);
+        if (prevWord) {
+          row = prevWord.row;
+          col = prevWord.col;
+        } else {
+          break;
+        }
       }
 
-      const { startRow, startCol } = getPositionFromOffsets(
-        offset,
-        offset,
-        lines,
-      );
       return {
         ...state,
-        cursorRow: startRow,
-        cursorCol: startCol,
+        cursorRow: row,
+        cursorCol: col,
         preferredCol: null,
       };
     }
 
     case 'vim_move_word_end': {
       const { count } = action.payload;
-      let offset = getOffsetFromPosition(cursorRow, cursorCol, lines);
+      let row = cursorRow;
+      let col = cursorCol;
 
       for (let i = 0; i < count; i++) {
-        const newOffset = findWordEnd(getText(), offset);
-
         // Special handling for the first iteration when we're at end of word
         if (i === 0) {
-          const currentLine = lines[cursorRow] || '';
+          const currentLine = lines[row] || '';
           const lineCodePoints = [...currentLine];
           const atEndOfWord =
-            cursorCol < lineCodePoints.length &&
-            /\w/.test(lineCodePoints[cursorCol]) &&
-            (cursorCol + 1 >= lineCodePoints.length ||
-              !/\w/.test(lineCodePoints[cursorCol + 1]));
+            col < lineCodePoints.length &&
+            isWordCharStrict(lineCodePoints[col]) &&
+            (col + 1 >= lineCodePoints.length || !isWordCharStrict(lineCodePoints[col + 1]));
 
           if (atEndOfWord) {
-            // Check if findWordEnd found a word on a subsequent line
-            const { startRow, startCol } = getPositionFromOffsets(
-              newOffset,
-              newOffset,
-              lines,
-            );
-
-            // If findWordEnd found a word on a later line, use it
-            if (startRow > cursorRow) {
-              offset = newOffset;
+            // We're already at end of word, find next word end
+            const nextWord = findNextWordAcrossLines(lines, row, col + 1, false);
+            if (nextWord) {
+              row = nextWord.row;
+              col = nextWord.col;
               continue;
-            }
-
-            // If findWordEnd didn't find a word (moved to newline), look for next non-empty line
-            if (startRow === cursorRow && startCol >= cpLen(currentLine)) {
-              const nextPosition = findNextWordAcrossLines(
-                getText,
-                lines,
-                cursorRow,
-                false, // searchForWordStart = false (we want word end)
-              );
-
-              if (nextPosition) {
-                if (nextPosition.row !== cursorRow) {
-                  // We found a position on a different line, return it directly
-                  return {
-                    ...state,
-                    cursorRow: nextPosition.row,
-                    cursorCol: nextPosition.col,
-                    preferredCol: null,
-                  };
-                } else {
-                  // Continue with the found offset
-                  offset = getOffsetFromPosition(
-                    nextPosition.row,
-                    nextPosition.col,
-                    lines,
-                  );
-                  continue;
-                }
-              }
             }
           }
         }
 
-        offset = newOffset;
+        const wordEnd = findNextWordAcrossLines(lines, row, col, false);
+        if (wordEnd) {
+          row = wordEnd.row;
+          col = wordEnd.col;
+        } else {
+          break;
+        }
       }
 
-      const { startRow, startCol } = getPositionFromOffsets(
-        offset,
-        offset,
-        lines,
-      );
       return {
         ...state,
-        cursorRow: startRow,
-        cursorCol: startCol,
+        cursorRow: row,
+        cursorCol: col,
         preferredCol: null,
       };
     }
