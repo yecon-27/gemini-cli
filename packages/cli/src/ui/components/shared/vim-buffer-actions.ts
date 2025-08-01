@@ -14,13 +14,9 @@ import {
   isWordCharStrict,
   findNextWordAcrossLines,
   findPrevWordAcrossLines,
-  findNextWordStartInLine,
-  findPrevWordStartInLine,
   findWordEndInLine,
-  isWhitespace,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
-
 
 export type VimAction = Extract<
   TextBufferAction,
@@ -65,119 +61,7 @@ export function handleVimAction(
   const { lines, cursorRow, cursorCol } = state;
 
   switch (action.type) {
-    case 'vim_delete_word_forward': {
-      const { count } = action.payload;
-      let endRow = cursorRow;
-      let endCol = cursorCol;
-
-      for (let i = 0; i < count; i++) {
-        const nextWord = findNextWordAcrossLines(lines, endRow, endCol, true);
-        if (nextWord) {
-          endRow = nextWord.row;
-          endCol = nextWord.col;
-        } else {
-          // No more words, delete to end of current word or line
-          const currentLine = lines[endRow] || '';
-          const wordEnd = findWordEndInLine(currentLine, endCol);
-          if (wordEnd !== null) {
-            endCol = wordEnd + 1; // Include the character at word end
-          } else {
-            endCol = cpLen(currentLine);
-          }
-          break;
-        }
-      }
-
-      if (endRow !== cursorRow || endCol !== cursorCol) {
-        const nextState = pushUndo(state);
-        return replaceRangeInternal(
-          nextState,
-          cursorRow,
-          cursorCol,
-          endRow,
-          endCol,
-          '',
-        );
-      }
-      return state;
-    }
-
-    case 'vim_delete_word_backward': {
-      const { count } = action.payload;
-      let startRow = cursorRow;
-      let startCol = cursorCol;
-
-      for (let i = 0; i < count; i++) {
-        const prevWord = findPrevWordAcrossLines(lines, startRow, startCol);
-        if (prevWord) {
-          startRow = prevWord.row;
-          startCol = prevWord.col;
-        } else {
-          break;
-        }
-      }
-
-      if (startRow !== cursorRow || startCol !== cursorCol) {
-        const nextState = pushUndo(state);
-        return replaceRangeInternal(
-          nextState,
-          startRow,
-          startCol,
-          cursorRow,
-          cursorCol,
-          '',
-        );
-      }
-      return state;
-    }
-
-    case 'vim_delete_word_end': {
-      const { count } = action.payload;
-      let row = cursorRow;
-      let col = cursorCol;
-      let endRow = cursorRow;
-      let endCol = cursorCol;
-
-      for (let i = 0; i < count; i++) {
-        const wordEnd = findNextWordAcrossLines(lines, row, col, false);
-        if (wordEnd) {
-          endRow = wordEnd.row;
-          endCol = wordEnd.col + 1; // Include the character at word end
-          // For next iteration, move to start of next word
-          if (i < count - 1) {
-            const nextWord = findNextWordAcrossLines(lines, wordEnd.row, wordEnd.col + 1, true);
-            if (nextWord) {
-              row = nextWord.row;
-              col = nextWord.col;
-            } else {
-              break; // No more words
-            }
-          }
-        } else {
-          break;
-        }
-      }
-
-      // Ensure we don't go past the end of the last line
-      if (endRow < lines.length) {
-        const lineLen = cpLen(lines[endRow] || '');
-        endCol = Math.min(endCol, lineLen);
-      }
-
-      if (endRow !== cursorRow || endCol !== cursorCol) {
-        const nextState = pushUndo(state);
-        return replaceRangeInternal(
-          nextState,
-          cursorRow,
-          cursorCol,
-          endRow,
-          endCol,
-          '',
-        );
-      }
-      return state;
-    }
-
+    case 'vim_delete_word_forward':
     case 'vim_change_word_forward': {
       const { count } = action.payload;
       let endRow = cursorRow;
@@ -189,7 +73,7 @@ export function handleVimAction(
           endRow = nextWord.row;
           endCol = nextWord.col;
         } else {
-          // No more words, change to end of current word or line
+          // No more words, delete/change to end of current word or line
           const currentLine = lines[endRow] || '';
           const wordEnd = findWordEndInLine(currentLine, endCol);
           if (wordEnd !== null) {
@@ -215,6 +99,7 @@ export function handleVimAction(
       return state;
     }
 
+    case 'vim_delete_word_backward':
     case 'vim_change_word_backward': {
       const { count } = action.payload;
       let startRow = cursorRow;
@@ -244,6 +129,7 @@ export function handleVimAction(
       return state;
     }
 
+    case 'vim_delete_word_end':
     case 'vim_change_word_end': {
       const { count } = action.payload;
       let row = cursorRow;
@@ -258,7 +144,12 @@ export function handleVimAction(
           endCol = wordEnd.col + 1; // Include the character at word end
           // For next iteration, move to start of next word
           if (i < count - 1) {
-            const nextWord = findNextWordAcrossLines(lines, wordEnd.row, wordEnd.col + 1, true);
+            const nextWord = findNextWordAcrossLines(
+              lines,
+              wordEnd.row,
+              wordEnd.col + 1,
+              true,
+            );
             if (nextWord) {
               row = nextWord.row;
               col = nextWord.col;
@@ -355,22 +246,7 @@ export function handleVimAction(
       );
     }
 
-    case 'vim_delete_to_end_of_line': {
-      const currentLine = lines[cursorRow] || '';
-      if (cursorCol < cpLen(currentLine)) {
-        const nextState = pushUndo(state);
-        return replaceRangeInternal(
-          nextState,
-          cursorRow,
-          cursorCol,
-          cursorRow,
-          cpLen(currentLine),
-          '',
-        );
-      }
-      return state;
-    }
-
+    case 'vim_delete_to_end_of_line':
     case 'vim_change_to_end_of_line': {
       const currentLine = lines[cursorRow] || '';
       if (cursorCol < cpLen(currentLine)) {
@@ -670,11 +546,17 @@ export function handleVimAction(
           const atEndOfWord =
             col < lineCodePoints.length &&
             isWordCharStrict(lineCodePoints[col]) &&
-            (col + 1 >= lineCodePoints.length || !isWordCharStrict(lineCodePoints[col + 1]));
+            (col + 1 >= lineCodePoints.length ||
+              !isWordCharStrict(lineCodePoints[col + 1]));
 
           if (atEndOfWord) {
             // We're already at end of word, find next word end
-            const nextWord = findNextWordAcrossLines(lines, row, col + 1, false);
+            const nextWord = findNextWordAcrossLines(
+              lines,
+              row,
+              col + 1,
+              false,
+            );
             if (nextWord) {
               row = nextWord.row;
               col = nextWord.col;

@@ -34,58 +34,64 @@ function isWordChar(ch: string | undefined): boolean {
 }
 
 // Helper functions for line-based word navigation
-export const isWordCharStrict = (char: string): boolean => {
-  return /\w/.test(char);
-};
+export const isWordCharStrict = (char: string): boolean => /\w/.test(char);
 
-export const isWhitespace = (char: string): boolean => {
-  return /\s/.test(char);
-};
+export const isWhitespace = (char: string): boolean => /\s/.test(char);
 
 // Find next word start within a line, starting from col
-export const findNextWordStartInLine = (line: string, col: number): number | null => {
+export const findNextWordStartInLine = (
+  line: string,
+  col: number,
+): number | null => {
   const chars = [...line]; // Handle Unicode properly
   let i = col;
-  
+
   if (i >= chars.length) return null;
-  
+
   const currentChar = chars[i];
-  
+
   // Skip current word/sequence based on character type
   if (isWordCharStrict(currentChar)) {
     while (i < chars.length && isWordCharStrict(chars[i])) {
       i++;
     }
   } else if (!isWhitespace(currentChar)) {
-    while (i < chars.length && !isWordCharStrict(chars[i]) && !isWhitespace(chars[i])) {
+    while (
+      i < chars.length &&
+      !isWordCharStrict(chars[i]) &&
+      !isWhitespace(chars[i])
+    ) {
       i++;
     }
   }
-  
+
   // Skip whitespace
   while (i < chars.length && isWhitespace(chars[i])) {
     i++;
   }
-  
+
   return i < chars.length ? i : null;
 };
 
 // Find previous word start within a line
-export const findPrevWordStartInLine = (line: string, col: number): number | null => {
+export const findPrevWordStartInLine = (
+  line: string,
+  col: number,
+): number | null => {
   const chars = [...line];
   let i = col;
-  
+
   if (i <= 0) return null;
-  
+
   i--;
-  
+
   // Skip whitespace moving backwards
   while (i >= 0 && isWhitespace(chars[i])) {
     i--;
   }
-  
+
   if (i < 0) return null;
-  
+
   if (isWordCharStrict(chars[i])) {
     // We're in a word, move to its beginning
     while (i >= 0 && isWordCharStrict(chars[i])) {
@@ -105,7 +111,7 @@ export const findPrevWordStartInLine = (line: string, col: number): number | nul
 export const findWordEndInLine = (line: string, col: number): number | null => {
   const chars = [...line];
   let i = col;
-  
+
   // If we're already at the end of a word, advance to next word
   if (
     i < chars.length &&
@@ -119,19 +125,19 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
       i++;
     }
   }
-  
+
   // If we're not on a word character, find the next word
   if (i < chars.length && !isWordCharStrict(chars[i])) {
     while (i < chars.length && !isWordCharStrict(chars[i])) {
       i++;
     }
   }
-  
+
   // Move to end of current word
   while (i < chars.length && isWordCharStrict(chars[i])) {
     i++;
   }
-  
+
   // Move back one to be on the last character of the word
   return i > col ? i - 1 : null;
 };
@@ -148,16 +154,16 @@ export const findNextWordAcrossLines = (
   const colInCurrentLine = searchForWordStart
     ? findNextWordStartInLine(currentLine, cursorCol)
     : findWordEndInLine(currentLine, cursorCol);
-    
+
   if (colInCurrentLine !== null) {
     return { row: cursorRow, col: colInCurrentLine };
   }
-  
+
   // Search subsequent lines
   for (let row = cursorRow + 1; row < lines.length; row++) {
     const line = lines[row] || '';
     const chars = [...line];
-    
+
     // For empty lines, if we haven't found any words yet, return the empty line
     if (chars.length === 0) {
       // Check if there are any words in remaining lines
@@ -166,7 +172,10 @@ export const findNextWordAcrossLines = (
         const laterLine = lines[laterRow] || '';
         const laterChars = [...laterLine];
         let firstNonWhitespace = 0;
-        while (firstNonWhitespace < laterChars.length && isWhitespace(laterChars[firstNonWhitespace])) {
+        while (
+          firstNonWhitespace < laterChars.length &&
+          isWhitespace(laterChars[firstNonWhitespace])
+        ) {
           firstNonWhitespace++;
         }
         if (firstNonWhitespace < laterChars.length) {
@@ -174,20 +183,23 @@ export const findNextWordAcrossLines = (
           break;
         }
       }
-      
+
       // If no words in later lines, return the empty line
       if (!hasWordsInLaterLines) {
         return { row, col: 0 };
       }
       continue;
     }
-    
+
     // Find first non-whitespace
     let firstNonWhitespace = 0;
-    while (firstNonWhitespace < chars.length && isWhitespace(chars[firstNonWhitespace])) {
+    while (
+      firstNonWhitespace < chars.length &&
+      isWhitespace(chars[firstNonWhitespace])
+    ) {
       firstNonWhitespace++;
     }
-    
+
     if (firstNonWhitespace < chars.length) {
       if (searchForWordStart) {
         return { row, col: firstNonWhitespace };
@@ -200,7 +212,7 @@ export const findNextWordAcrossLines = (
       }
     }
   }
-  
+
   return null;
 };
 
@@ -213,24 +225,24 @@ export const findPrevWordAcrossLines = (
   // First try current line
   const currentLine = lines[cursorRow] || '';
   const colInCurrentLine = findPrevWordStartInLine(currentLine, cursorCol);
-  
+
   if (colInCurrentLine !== null) {
     return { row: cursorRow, col: colInCurrentLine };
   }
-  
+
   // Search previous lines
   for (let row = cursorRow - 1; row >= 0; row--) {
     const line = lines[row] || '';
     const chars = [...line];
-    
+
     if (chars.length === 0) continue;
-    
+
     // Find last word start
     let lastWordStart = chars.length;
     while (lastWordStart > 0 && isWhitespace(chars[lastWordStart - 1])) {
       lastWordStart--;
     }
-    
+
     if (lastWordStart > 0) {
       // Find start of this word
       const wordStart = findPrevWordStartInLine(line, lastWordStart);
@@ -239,7 +251,7 @@ export const findPrevWordAcrossLines = (
       }
     }
   }
-  
+
   return null;
 };
 
