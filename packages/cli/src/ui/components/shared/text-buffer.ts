@@ -255,7 +255,7 @@ export const findPrevWordAcrossLines = (
   return null;
 };
 
-// Helper functions for vim line operations (offset-based)
+// Helper functions for vim line operations
 export const getPositionFromOffsets = (
   startOffset: number,
   endOffset: number,
