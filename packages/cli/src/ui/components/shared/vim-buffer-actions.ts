@@ -18,6 +18,46 @@ import {
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
 
+// Helper function to handle word movement across empty lines.
+function findNextWordAcrossLines(
+  getText: () => string,
+  lines: string[],
+  cursorRow: number,
+  searchForWordStart: boolean,
+): { row: number; col: number } | null {
+  // Look for next line with content
+  let nextLineWithContent = -1;
+  for (let lineIdx = cursorRow + 1; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx] || '';
+    if (line.trim().length > 0) {
+      nextLineWithContent = lineIdx;
+      break;
+    }
+  }
+
+  if (nextLineWithContent !== -1) {
+    // Move to the word on that line
+    const nextLineOffset = getOffsetFromPosition(nextLineWithContent, 0, lines);
+    const wordOffset = searchForWordStart
+      ? findNextWordStart(getText(), nextLineOffset)
+      : findWordEnd(getText(), nextLineOffset);
+
+    const { startRow, startCol } = getPositionFromOffsets(
+      wordOffset,
+      wordOffset,
+      lines,
+    );
+    return { row: startRow, col: startCol };
+  } else {
+    // No more lines with content, move to next line (could be empty)
+    if (cursorRow < lines.length - 1) {
+      return { row: cursorRow + 1, col: 0 };
+    }
+  }
+
+  return null;
+}
+
 export type VimAction = Extract<
   TextBufferAction,
   | { type: 'vim_delete_word_forward' }
@@ -650,42 +690,30 @@ export function handleVimAction(
 
             // If findNextWordStart moved us past the current line but didn't find a word
             if (startRow === cursorRow && startCol >= currentLine.length) {
-              // Look for next line with content
-              let nextLineWithContent = -1;
-              for (
-                let lineIdx = cursorRow + 1;
-                lineIdx < lines.length;
-                lineIdx++
-              ) {
-                const line = lines[lineIdx] || '';
-                if (line.trim().length > 0) {
-                  nextLineWithContent = lineIdx;
-                  break;
-                }
-              }
+              const nextPosition = findNextWordAcrossLines(
+                getText,
+                lines,
+                cursorRow,
+                true, // searchForWordStart
+              );
 
-              if (nextLineWithContent !== -1) {
-                // Move to start of first word on that line
-                const nextLineOffset = getOffsetFromPosition(
-                  nextLineWithContent,
-                  0,
-                  lines,
-                );
-                const wordStartOffset = findNextWordStart(
-                  getText(),
-                  nextLineOffset,
-                );
-                offset = wordStartOffset;
-                continue;
-              } else {
-                // No more lines with content, move to next line (could be empty)
-                if (cursorRow < lines.length - 1) {
+              if (nextPosition) {
+                if (nextPosition.row !== cursorRow) {
+                  // We found a position on a different line, return it directly
                   return {
                     ...state,
-                    cursorRow: cursorRow + 1,
-                    cursorCol: 0,
+                    cursorRow: nextPosition.row,
+                    cursorCol: nextPosition.col,
                     preferredCol: null,
                   };
+                } else {
+                  // Continue with the found offset
+                  offset = getOffsetFromPosition(
+                    nextPosition.row,
+                    nextPosition.col,
+                    lines,
+                  );
+                  continue;
                 }
               }
             }
@@ -764,39 +792,30 @@ export function handleVimAction(
 
             // If findWordEnd didn't find a word (moved to newline), look for next non-empty line
             if (startRow === cursorRow && startCol >= currentLine.length) {
-              // Search for next line with content
-              let nextLineWithContent = -1;
-              for (
-                let lineIdx = cursorRow + 1;
-                lineIdx < lines.length;
-                lineIdx++
-              ) {
-                const line = lines[lineIdx] || '';
-                if (line.trim().length > 0) {
-                  nextLineWithContent = lineIdx;
-                  break;
-                }
-              }
+              const nextPosition = findNextWordAcrossLines(
+                getText,
+                lines,
+                cursorRow,
+                false, // searchForWordStart = false (we want word end)
+              );
 
-              if (nextLineWithContent !== -1) {
-                // Move to the end of first word on that line
-                const nextLineOffset = getOffsetFromPosition(
-                  nextLineWithContent,
-                  0,
-                  lines,
-                );
-                const wordEndOffset = findWordEnd(getText(), nextLineOffset);
-                offset = wordEndOffset;
-                continue;
-              } else {
-                // No more lines with content, move to next line (could be empty)
-                if (cursorRow < lines.length - 1) {
+              if (nextPosition) {
+                if (nextPosition.row !== cursorRow) {
+                  // We found a position on a different line, return it directly
                   return {
                     ...state,
-                    cursorRow: cursorRow + 1,
-                    cursorCol: 0,
+                    cursorRow: nextPosition.row,
+                    cursorCol: nextPosition.col,
                     preferredCol: null,
                   };
+                } else {
+                  // Continue with the found offset
+                  offset = getOffsetFromPosition(
+                    nextPosition.row,
+                    nextPosition.col,
+                    lines,
+                  );
+                  continue;
                 }
               }
             }
