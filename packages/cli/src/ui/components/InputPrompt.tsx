@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
 import { SuggestionsDisplay } from './SuggestionsDisplay.js';
@@ -59,6 +59,45 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   vimHandleInput,
 }) => {
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
+
+  // Memoize highlight ranges for performance.
+  const highlightRanges = useMemo(() => {
+    const ranges: Array<{ start: number; end: number }> = [];
+    // Regex to find words starting with @ or / that are preceded by whitespace or start of string.
+    const regex = /(?<=^|\s)[@/][^\s]*/g;
+    let match;
+    while ((match = regex.exec(buffer.text)) !== null) {
+      ranges.push({
+        start: match.index,
+        end: match.index + match[0].length,
+      });
+    }
+    return ranges;
+  }, [buffer.text]);
+
+  // Memoize visual line info to map visual lines back to their offset in the original text.
+  const visualLineInfos = useMemo(() => {
+    const infos: Array<{ text: string; offset: number }> = [];
+    const logicalLines = [...buffer.lines];
+    let currentLogicalLine = logicalLines.shift() || '';
+    let offset = 0;
+
+    for (const visualLine of buffer.allVisualLines) {
+      infos.push({ text: visualLine, offset });
+
+      const visualLen = cpLen(visualLine);
+      const logicalLen = cpLen(currentLogicalLine);
+
+      if (visualLen < logicalLen) {
+        offset += visualLen;
+        currentLogicalLine = cpSlice(currentLogicalLine, visualLen);
+      } else {
+        offset += visualLen + 1; // +1 for newline
+        currentLogicalLine = logicalLines.shift() || '';
+      }
+    }
+    return infos;
+  }, [buffer.lines, buffer.allVisualLines]);
 
   const [dirs, setDirs] = useState<readonly string[]>(
     config.getWorkspaceContext().getDirectories(),
@@ -375,84 +414,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
 
-  const renderLine = (
-    lineText: string,
-    isCursorLine: boolean,
-    cursorCol: number,
-  ) => {
-    const regex = /(\/[a-zA-Z0-9_-]+|@[a-zA-Z0-9_./-]+)/g;
-    const parts: Array<{ text: string; highlighted: boolean }> = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = regex.exec(lineText)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push({
-          text: lineText.substring(lastIndex, match.index),
-          highlighted: false,
-        });
-      }
-      parts.push({ text: match[0], highlighted: true });
-      lastIndex = regex.lastIndex;
-    }
-
-    if (lastIndex < lineText.length) {
-      parts.push({
-        text: lineText.substring(lastIndex),
-        highlighted: false,
-      });
-    }
-
-    if (parts.length === 0 && lineText.length > 0) {
-      parts.push({ text: lineText, highlighted: false });
-    }
-
-    let charIndex = 0;
-    const elements = parts.map((part, i) => {
-      const color = part.highlighted ? Colors.AccentPurple : undefined;
-
-      if (
-        !isCursorLine ||
-        cursorCol < charIndex ||
-        cursorCol >= charIndex + cpLen(part.text)
-      ) {
-        charIndex += cpLen(part.text);
-        return (
-          <Text key={i} color={color}>
-            {part.text}
-          </Text>
-        );
-      }
-
-      // Cursor is in this part
-      const relativeCursorCol = cursorCol - charIndex;
-      const before = cpSlice(part.text, 0, relativeCursorCol);
-      const cursorChar =
-        cpSlice(part.text, relativeCursorCol, relativeCursorCol + 1) || ' ';
-      const after = cpSlice(part.text, relativeCursorCol + 1);
-
-      charIndex += cpLen(part.text);
-
-      return (
-        <Text key={i} color={color}>
-          {before}
-          <Text inverse>{cursorChar}</Text>
-          {after}
-        </Text>
-      );
-    });
-
-    if (isCursorLine && cursorCol === cpLen(lineText)) {
-      elements.push(
-        <Text key="cursor" inverse>
-          {' '}
-        </Text>,
-      );
-    }
-
-    return <>{elements}</>;
-  };
-
   return (
     <>
       <Box
@@ -477,20 +438,125 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )
           ) : (
             linesToRender.map((lineText, visualIdxInRenderedSet) => {
-              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
-              let display = lineText;
-              const currentVisualWidth = stringWidth(display);
-              if (currentVisualWidth < inputWidth) {
-                display = display + ' '.repeat(inputWidth - currentVisualWidth);
+              const absoluteVisualIndex =
+                visualIdxInRenderedSet + buffer.visualScrollRow;
+              const lineInfo = visualLineInfos[absoluteVisualIndex];
+
+              // This should not happen, but as a safeguard:
+              if (!lineInfo) return null;
+
+              const { offset: lineOffset } = lineInfo;
+              const lineEndOffset = lineOffset + cpLen(lineText);
+
+              const parts: Array<{
+                text: string;
+                color?: string;
+                inverse?: boolean;
+              }> = [];
+              let lastIndex = 0;
+
+              // Apply command/path highlighting
+              for (const range of highlightRanges) {
+                const start = Math.max(lineOffset, range.start);
+                const end = Math.min(lineEndOffset, range.end);
+
+                if (start < end) {
+                  const preStart = start - lineOffset;
+                  if (preStart > lastIndex) {
+                    parts.push({
+                      text: cpSlice(lineText, lastIndex, preStart),
+                    });
+                  }
+                  parts.push({
+                    text: cpSlice(lineText, preStart, end - lineOffset),
+                    color: Colors.AccentPurple,
+                  });
+                  lastIndex = end - lineOffset;
+                }
               }
 
-              const isCursorLine =
-                focus && visualIdxInRenderedSet === cursorVisualRow;
-              const cursorCol = isCursorLine ? cursorVisualColAbsolute : -1;
+              if (lastIndex < cpLen(lineText)) {
+                parts.push({ text: cpSlice(lineText, lastIndex) });
+              }
+
+              // Pad line to full width
+              const currentVisualWidth = stringWidth(lineText);
+              if (currentVisualWidth < inputWidth) {
+                parts.push({
+                  text: ' '.repeat(inputWidth - currentVisualWidth),
+                });
+              }
+
+              let finalParts = parts;
+              const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
+
+              // Apply cursor highlighting
+              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
+                const cursorCol = cursorVisualColAbsolute;
+                let accumulatedWidth = 0;
+                let foundCursor = false;
+
+                const newParts: typeof parts = [];
+
+                for (const part of parts) {
+                  if (foundCursor) {
+                    newParts.push(part);
+                    continue;
+                  }
+
+                  const partWidth = cpLen(part.text);
+                  if (
+                    !foundCursor &&
+                    accumulatedWidth + partWidth >= cursorCol
+                  ) {
+                    const colInPart = cursorCol - accumulatedWidth;
+
+                    // Before cursor
+                    if (colInPart > 0) {
+                      newParts.push({
+                        ...part,
+                        text: cpSlice(part.text, 0, colInPart),
+                      });
+                    }
+
+                    // Cursor char
+                    const cursorChar =
+                      cpSlice(part.text, colInPart, colInPart + 1) || ' ';
+                    newParts.push({
+                      ...part,
+                      text: cursorChar,
+                      inverse: true,
+                    });
+
+                    // After cursor
+                    if (colInPart < partWidth - 1) {
+                      newParts.push({
+                        ...part,
+                        text: cpSlice(part.text, colInPart + 1),
+                      });
+                    }
+                    foundCursor = true;
+                  } else {
+                    newParts.push(part);
+                  }
+                  accumulatedWidth += partWidth;
+                }
+
+                // Handle cursor at the very end of the line
+                if (!foundCursor && accumulatedWidth === cursorCol) {
+                  newParts.push({ text: ' ', inverse: true });
+                }
+
+                finalParts = newParts;
+              }
 
               return (
                 <Text key={`line-${visualIdxInRenderedSet}`}>
-                  {renderLine(display, isCursorLine, cursorCol)}
+                  {finalParts.map((part, i) => (
+                    <Text key={i} color={part.color} inverse={part.inverse}>
+                      {part.text}
+                    </Text>
+                  ))}
                 </Text>
               );
             })
