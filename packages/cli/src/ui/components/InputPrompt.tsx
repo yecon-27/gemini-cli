@@ -375,6 +375,84 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     buffer.visualCursor;
   const scrollVisualRow = buffer.visualScrollRow;
 
+  const renderLine = (
+    lineText: string,
+    isCursorLine: boolean,
+    cursorCol: number,
+  ) => {
+    const regex = /(\/[a-zA-Z0-9_-]+|@[a-zA-Z0-9_./-]+)/g;
+    const parts: Array<{ text: string; highlighted: boolean }> = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(lineText)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({
+          text: lineText.substring(lastIndex, match.index),
+          highlighted: false,
+        });
+      }
+      parts.push({ text: match[0], highlighted: true });
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < lineText.length) {
+      parts.push({
+        text: lineText.substring(lastIndex),
+        highlighted: false,
+      });
+    }
+
+    if (parts.length === 0 && lineText.length > 0) {
+      parts.push({ text: lineText, highlighted: false });
+    }
+
+    let charIndex = 0;
+    const elements = parts.map((part, i) => {
+      const color = part.highlighted ? Colors.AccentPurple : undefined;
+
+      if (
+        !isCursorLine ||
+        cursorCol < charIndex ||
+        cursorCol >= charIndex + cpLen(part.text)
+      ) {
+        charIndex += cpLen(part.text);
+        return (
+          <Text key={i} color={color}>
+            {part.text}
+          </Text>
+        );
+      }
+
+      // Cursor is in this part
+      const relativeCursorCol = cursorCol - charIndex;
+      const before = cpSlice(part.text, 0, relativeCursorCol);
+      const cursorChar =
+        cpSlice(part.text, relativeCursorCol, relativeCursorCol + 1) || ' ';
+      const after = cpSlice(part.text, relativeCursorCol + 1);
+
+      charIndex += cpLen(part.text);
+
+      return (
+        <Text key={i} color={color}>
+          {before}
+          <Text inverse>{cursorChar}</Text>
+          {after}
+        </Text>
+      );
+    });
+
+    if (isCursorLine && cursorCol === cpLen(lineText)) {
+      elements.push(
+        <Text key="cursor" inverse>
+          {' '}
+        </Text>,
+      );
+    }
+
+    return <>{elements}</>;
+  };
+
   return (
     <>
       <Box
@@ -406,32 +484,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                 display = display + ' '.repeat(inputWidth - currentVisualWidth);
               }
 
-              if (focus && visualIdxInRenderedSet === cursorVisualRow) {
-                const relativeVisualColForHighlight = cursorVisualColAbsolute;
+              const isCursorLine =
+                focus && visualIdxInRenderedSet === cursorVisualRow;
+              const cursorCol = isCursorLine ? cursorVisualColAbsolute : -1;
 
-                if (relativeVisualColForHighlight >= 0) {
-                  if (relativeVisualColForHighlight < cpLen(display)) {
-                    const charToHighlight =
-                      cpSlice(
-                        display,
-                        relativeVisualColForHighlight,
-                        relativeVisualColForHighlight + 1,
-                      ) || ' ';
-                    const highlighted = chalk.inverse(charToHighlight);
-                    display =
-                      cpSlice(display, 0, relativeVisualColForHighlight) +
-                      highlighted +
-                      cpSlice(display, relativeVisualColForHighlight + 1);
-                  } else if (
-                    relativeVisualColForHighlight === cpLen(display) &&
-                    cpLen(display) === inputWidth
-                  ) {
-                    display = display + chalk.inverse(' ');
-                  }
-                }
-              }
               return (
-                <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
+                <Text key={`line-${visualIdxInRenderedSet}`}>
+                  {renderLine(display, isCursorLine, cursorCol)}
+                </Text>
               );
             })
           )}
