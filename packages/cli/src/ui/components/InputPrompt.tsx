@@ -507,7 +507,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   const partWidth = cpLen(part.text);
                   if (
                     !foundCursor &&
-                    accumulatedWidth + partWidth >= cursorCol
+                    accumulatedWidth + partWidth > cursorCol
                   ) {
                     const colInPart = cursorCol - accumulatedWidth;
 
