@@ -24,6 +24,7 @@ import {
   FileFilteringOptions,
   IdeClient,
 } from '@google/gemini-cli-core';
+import { mcpCommand } from '../commands/mcp.js';
 import { Settings } from './settings.js';
 
 import { Extension, annotateActiveExtensions } from './extension.js';
@@ -227,8 +228,10 @@ export async function parseArguments(): Promise<CliArgs> {
       return true;
     });
 
+  yargsInstance.command(mcpCommand);
+
   yargsInstance.wrap(yargsInstance.terminalWidth());
-  const result = yargsInstance.parseSync();
+  const result = await yargsInstance.parse();
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
