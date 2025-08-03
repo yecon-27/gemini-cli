@@ -12,7 +12,6 @@ import {
   requiresRestart,
   getDefaultValue,
   getRestartRequiredSettings,
-  parseSettingKey,
   getEffectiveValue,
   getAllSettingKeys,
   getSettingsByType,
@@ -109,27 +108,6 @@ describe('SettingsUtils', () => {
       expect(restartSettings).toContain('autoConfigureMaxOldSpaceSize');
       expect(restartSettings).toContain('checkpointing.enabled');
       expect(restartSettings).not.toContain('showMemoryUsage');
-    });
-  });
-
-  describe('parseSettingKey', () => {
-    it('should parse nested setting keys correctly', () => {
-      expect(parseSettingKey('accessibility.disableLoadingPhrases')).toEqual([
-        'accessibility',
-        'disableLoadingPhrases',
-      ]);
-      expect(parseSettingKey('fileFiltering.respectGitIgnore')).toEqual([
-        'fileFiltering',
-        'respectGitIgnore',
-      ]);
-    });
-
-    it('should parse top-level setting keys correctly', () => {
-      expect(parseSettingKey('showMemoryUsage')).toEqual([
-        'showMemoryUsage',
-        undefined,
-      ]);
-      expect(parseSettingKey('hideTips')).toEqual(['hideTips', undefined]);
     });
   });
 
@@ -244,7 +222,7 @@ describe('SettingsUtils', () => {
 
   describe('getSettingCategory', () => {
     it('should return correct category for valid settings', () => {
-      expect(getSettingCategory('showMemoryUsage')).toBe('General');
+      expect(getSettingCategory('showMemoryUsage')).toBe('UI');
       expect(getSettingCategory('accessibility.disableLoadingPhrases')).toBe(
         'Accessibility',
       );
