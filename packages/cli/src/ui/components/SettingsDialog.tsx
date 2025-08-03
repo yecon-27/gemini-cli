@@ -25,6 +25,7 @@ import {
   isDefaultValue,
   requiresRestart,
   getRestartRequiredFromModified,
+  getDefaultValue,
 } from '../../utils/settingsUtils.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 
@@ -243,6 +244,48 @@ export function SettingsDialog({
         }
       } else if (key.return || input === ' ') {
         items[activeSettingIndex]?.toggle();
+      } else if ((key.ctrl && input === 'c') || (key.ctrl && input === 'l')) {
+        // Ctrl+C or Ctrl+L: Clear current setting and reset to default
+        const currentSetting = items[activeSettingIndex];
+        if (currentSetting) {
+          const defaultValue = getDefaultValue(currentSetting.value);
+
+          // Update pending settings to default value
+          setPendingSettings((prev) =>
+            setPendingSettingValue(currentSetting.value, defaultValue, prev),
+          );
+
+          // Remove from modified settings since it's now at default
+          setModifiedSettings((prev) => {
+            const updated = new Set(prev);
+            updated.delete(currentSetting.value);
+            return updated;
+          });
+
+          // Remove from restart-required settings if it was there
+          setRestartRequiredSettings((prev) => {
+            const updated = new Set(prev);
+            updated.delete(currentSetting.value);
+            return updated;
+          });
+
+          // If this setting doesn't require restart, save it immediately
+          if (!requiresRestart(currentSetting.value)) {
+            const immediateSettings = new Set([currentSetting.value]);
+            const immediateSettingsObject = setPendingSettingValue(
+              currentSetting.value,
+              defaultValue,
+              {},
+            );
+
+            saveModifiedSettings(
+              immediateSettings,
+              immediateSettingsObject,
+              settings,
+              selectedScope,
+            );
+          }
+        }
       }
     }
     if (showRestartPrompt && input === 'r') {
