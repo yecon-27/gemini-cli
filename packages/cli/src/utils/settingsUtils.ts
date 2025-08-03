@@ -10,7 +10,6 @@ import {
   SettingDefinition,
 } from '../config/settingsSchema.js';
 
-
 /**
  * Get all settings grouped by category
  */

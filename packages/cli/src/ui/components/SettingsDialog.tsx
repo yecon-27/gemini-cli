@@ -131,9 +131,49 @@ export function SettingsDialog({
               });
             }
 
-            setPendingSettings(
-              structuredClone(settings.forScope(selectedScope).settings),
-            );
+            // Capture the current modified settings before updating state
+            const currentModifiedSettings = new Set(modifiedSettings);
+
+            // Remove the saved setting from modifiedSettings since it's now saved
+            setModifiedSettings((prev) => {
+              const updated = new Set(prev);
+              updated.delete(key);
+              return updated;
+            });
+
+            // Also remove from restart-required settings if it was there
+            setRestartRequiredSettings((prev) => {
+              const updated = new Set(prev);
+              updated.delete(key);
+              return updated;
+            });
+
+            // Update pending settings to reflect the newly saved state
+            // while preserving other pending changes by reapplying them
+            setPendingSettings((prevPending) => {
+              // Start with the current saved state (which now includes our just-saved change)
+              let updatedPending = structuredClone(
+                settings.forScope(selectedScope).settings,
+              );
+
+              // Reapply any other pending changes that weren't just saved
+              currentModifiedSettings.forEach((modifiedKey) => {
+                if (modifiedKey !== key) {
+                  const modifiedValue = getSettingValue(
+                    modifiedKey,
+                    prevPending,
+                    {},
+                  );
+                  updatedPending = setPendingSettingValue(
+                    modifiedKey,
+                    modifiedValue,
+                    updatedPending,
+                  );
+                }
+              });
+
+              return updatedPending;
+            });
           } else {
             setModifiedSettings((prev) => {
               const updated = new Set(prev).add(key);
