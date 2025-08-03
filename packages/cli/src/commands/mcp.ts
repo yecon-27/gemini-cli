@@ -95,6 +95,7 @@ const addCommand: CommandModule = {
   describe: 'Add a server',
   builder: (yargs) =>
     yargs
+      .usage('Usage: gemini mcp add [options] <name> <commandOrUrl> [args...]')
       .positional('name', {
         describe: 'Name of the server',
         type: 'string',
@@ -153,8 +154,7 @@ export const mcpCommand: CommandModule = {
   builder: (yargs: Argv) =>
     yargs
       .command(addCommand)
-      .demandCommand(1, 'You need at least one command before continuing.')
-      .help(false),
+      .demandCommand(1, 'You need at least one command before continuing.'),
   handler: () => {
     // yargs will automatically show help if no subcommand is provided
     // thanks to demandCommand(1) in the builder.
