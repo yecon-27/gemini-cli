@@ -13,7 +13,6 @@ import {
 import * as fsp from 'fs/promises';
 import {
   MCPServerConfig,
-  getMCPServerStatus,
   MCPServerStatus,
   createTransport,
 } from '@google/gemini-cli-core';
@@ -59,14 +58,14 @@ async function testMCPConnection(
   try {
     // Use the same transport creation logic as core
     const transport = await createTransport(serverName, config, false);
-    
+
     try {
       // Attempt actual MCP connection with short timeout
-      await client.connect(transport, { timeout: 10000 }); // 10s timeout
-      
+      await client.connect(transport, { timeout: 5000 }); // 5s timeout
+
       // Test basic MCP protocol by listing tools
       await client.listTools();
-      
+
       await client.close();
     } catch (error) {
       await transport.close();
@@ -82,16 +81,11 @@ async function getServerStatus(
   serverName: string,
   server: MCPServerConfig,
 ): Promise<MCPServerStatus> {
-  // For stdio servers, use existing logic which tracks actual connection state
-  if (server.command) {
-    return getMCPServerStatus(serverName);
-  }
-  
-  // For HTTP/SSE servers, do proper MCP connection test
+  // Test all server types by attempting actual connection
   try {
     await testMCPConnection(serverName, server);
     return MCPServerStatus.CONNECTED;
-  } catch (error) {
+  } catch (_error) {
     return MCPServerStatus.DISCONNECTED;
   }
 }
@@ -109,15 +103,13 @@ async function listMcpServers(): Promise<void> {
 
   for (const serverName of serverNames) {
     const server = mcpServers[serverName];
-    
+
     let status: MCPServerStatus;
-    let errorDetails: string | null = null;
-    
+
     try {
       status = await getServerStatus(serverName, server);
-    } catch (error) {
+    } catch (_error) {
       status = MCPServerStatus.DISCONNECTED;
-      errorDetails = String(error);
     }
 
     let statusIndicator = '';
@@ -160,9 +152,11 @@ async function addMcpServer(
     transport: string;
     env: string[] | undefined;
     header: string[] | undefined;
+    timeout?: number;
+    trust?: boolean;
   },
 ) {
-  const { scope, transport, env, header } = options;
+  const { scope, transport, env, header, timeout, trust } = options;
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
   const settingsPath = getSettingsFilePath(settingsScope, process.cwd());
@@ -186,12 +180,16 @@ async function addMcpServer(
       newServer = {
         url: commandOrUrl,
         headers,
+        timeout,
+        trust,
       };
       break;
     case 'http':
       newServer = {
         httpUrl: commandOrUrl,
         headers,
+        timeout,
+        trust,
       };
       break;
     case 'stdio':
@@ -209,6 +207,8 @@ async function addMcpServer(
           },
           {} as Record<string, string>,
         ),
+        timeout,
+        trust,
       };
       break;
   }
@@ -317,6 +317,14 @@ const addCommand: CommandModule = {
           'Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "Authorization: Bearer abc123")',
         type: 'array',
         string: true,
+      })
+      .option('timeout', {
+        describe: 'Set connection timeout in milliseconds',
+        type: 'number',
+      })
+      .option('trust', {
+        describe: 'Trust the server',
+        type: 'boolean',
       }),
   handler: async (argv) => {
     await addMcpServer(
@@ -328,9 +336,10 @@ const addCommand: CommandModule = {
         transport: argv.transport as string,
         env: argv.env as string[],
         header: argv.header as string[],
+        timeout: argv.timeout as number | undefined,
+        trust: argv.trust as boolean | undefined,
       },
     );
-    process.exit(0);
   },
 };
 
@@ -356,7 +365,6 @@ const removeCommand: CommandModule = {
     await removeMcpServer(argv.name as string, {
       scope: argv.scope as string,
     });
-    process.exit(0);
   },
 };
 
@@ -365,7 +373,6 @@ const listCommand: CommandModule = {
   describe: 'List all configured MCP servers',
   handler: async () => {
     await listMcpServers();
-    process.exit(0);
   },
 };
 
