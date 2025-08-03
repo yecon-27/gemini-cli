@@ -77,6 +77,12 @@ async function addMcpServer(
 
   const existingSettings = settings.forScope(settingsScope).settings;
   const mcpServers = existingSettings.mcpServers || {};
+
+  const isExistingServer = !!mcpServers[name];
+  if (isExistingServer) {
+    console.log(`Server "${name}" is already configured, updating configuration.`);
+  }
+
   mcpServers[name] = newServer as MCPServerConfig;
 
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
@@ -87,7 +93,44 @@ async function addMcpServer(
   jsonContent.mcpServers = mcpServers;
   await fsp.writeFile(settingsPath, JSON.stringify(jsonContent, null, 2));
 
-  console.log(`Server "${name}" added to ${scope} settings.`);
+  if (isExistingServer) {
+    console.log(`Server "${name}" updated in ${scope} settings.`);
+  } else {
+    console.log(`Server "${name}" added to ${scope} settings.`);
+  }
+}
+
+async function removeMcpServer(
+  name: string,
+  options: {
+    scope: string;
+  },
+) {
+  const { scope } = options;
+  const settingsScope =
+    scope === 'user' ? SettingScope.User : SettingScope.Workspace;
+  const settingsPath = getSettingsFilePath(settingsScope, process.cwd());
+  const settings = loadSettings(process.cwd());
+
+  const existingSettings = settings.forScope(settingsScope).settings;
+  const mcpServers = existingSettings.mcpServers || {};
+
+  if (!mcpServers[name]) {
+    console.log(`Server "${name}" not found in ${scope} settings.`);
+    return;
+  }
+
+  delete mcpServers[name];
+
+  settings.setValue(settingsScope, 'mcpServers', mcpServers);
+
+  // The settings object doesn't expose a direct way to save, so we have to do it manually.
+  const fileContent = await fsp.readFile(settingsPath, 'utf-8');
+  const jsonContent = JSON.parse(fileContent);
+  jsonContent.mcpServers = mcpServers;
+  await fsp.writeFile(settingsPath, JSON.stringify(jsonContent, null, 2));
+
+  console.log(`Server "${name}" removed from ${scope} settings.`);
 }
 
 const addCommand: CommandModule = {
@@ -102,7 +145,7 @@ const addCommand: CommandModule = {
         demandOption: true,
       })
       .positional('commandOrUrl', {
-        describe: 'Command or URL',
+        describe: 'Command (stdio) or URL (sse, http)',
         type: 'string',
         demandOption: true,
       })
@@ -129,7 +172,7 @@ const addCommand: CommandModule = {
       .option('header', {
         alias: 'H',
         describe:
-          'Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "X-Custom: value")',
+          'Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "Authorization: Bearer abc123")',
         type: 'array',
         string: true,
       }),
@@ -145,6 +188,33 @@ const addCommand: CommandModule = {
         header: argv.header as string[],
       },
     );
+    process.exit(0);
+  },
+};
+
+const removeCommand: CommandModule = {
+  command: 'remove <name>',
+  describe: 'Remove a server',
+  builder: (yargs) =>
+    yargs
+      .usage('Usage: gemini mcp remove [options] <name>')
+      .positional('name', {
+        describe: 'Name of the server',
+        type: 'string',
+        demandOption: true,
+      })
+      .option('scope', {
+        alias: 's',
+        describe: 'Configuration scope (user or project)',
+        type: 'string',
+        default: 'project',
+        choices: ['user', 'project'],
+      }),
+  handler: async (argv) => {
+    await removeMcpServer(argv.name as string, {
+      scope: argv.scope as string,
+    });
+    process.exit(0);
   },
 };
 
@@ -154,7 +224,9 @@ export const mcpCommand: CommandModule = {
   builder: (yargs: Argv) =>
     yargs
       .command(addCommand)
-      .demandCommand(1, 'You need at least one command before continuing.'),
+      .command(removeCommand)
+      .demandCommand(1, 'You need at least one command before continuing.')
+      .version(false),
   handler: () => {
     // yargs will automatically show help if no subcommand is provided
     // thanks to demandCommand(1) in the builder.
