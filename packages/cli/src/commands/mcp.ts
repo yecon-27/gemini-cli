@@ -5,12 +5,7 @@
  */
 
 import type { CommandModule, Argv } from 'yargs';
-import {
-  loadSettings,
-  SettingScope,
-  getSettingsFilePath,
-} from '../config/settings.js';
-import * as fsp from 'fs/promises';
+import { loadSettings, SettingScope } from '../config/settings.js';
 import {
   MCPServerConfig,
   MCPServerStatus,
@@ -159,7 +154,6 @@ async function addMcpServer(
   const { scope, transport, env, header, timeout, trust } = options;
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
-  const settingsPath = getSettingsFilePath(settingsScope, process.cwd());
   const settings = loadSettings(process.cwd());
 
   let newServer: Partial<MCPServerConfig> = {};
@@ -227,12 +221,6 @@ async function addMcpServer(
 
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
-  // The settings object doesn't expose a direct way to save, so we have to do it manually.
-  const fileContent = await fsp.readFile(settingsPath, 'utf-8');
-  const jsonContent = JSON.parse(fileContent);
-  jsonContent.mcpServers = mcpServers;
-  await fsp.writeFile(settingsPath, JSON.stringify(jsonContent, null, 2));
-
   if (isExistingServer) {
     console.log(`MCP server "${name}" updated in ${scope} settings.`);
   } else {
@@ -251,7 +239,6 @@ async function removeMcpServer(
   const { scope } = options;
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
-  const settingsPath = getSettingsFilePath(settingsScope, process.cwd());
   const settings = loadSettings(process.cwd());
 
   const existingSettings = settings.forScope(settingsScope).settings;
@@ -265,12 +252,6 @@ async function removeMcpServer(
   delete mcpServers[name];
 
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
-
-  // The settings object doesn't expose a direct way to save, so we have to do it manually.
-  const fileContent = await fsp.readFile(settingsPath, 'utf-8');
-  const jsonContent = JSON.parse(fileContent);
-  jsonContent.mcpServers = mcpServers;
-  await fsp.writeFile(settingsPath, JSON.stringify(jsonContent, null, 2));
 
   console.log(`Server "${name}" removed from ${scope} settings.`);
 }
@@ -323,7 +304,8 @@ const addCommand: CommandModule = {
         type: 'number',
       })
       .option('trust', {
-        describe: 'Trust the server',
+        describe:
+          'Trust the server (bypass all tool call confirmation prompts)',
         type: 'boolean',
       }),
   handler: async (argv) => {

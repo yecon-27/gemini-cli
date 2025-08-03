@@ -433,19 +433,3 @@ export function saveSettings(settingsFile: SettingsFile): void {
     console.error('Error saving user settings file:', error);
   }
 }
-
-export function getSettingsFilePath(
-  scope: SettingScope,
-  workspaceDir: string,
-): string {
-  switch (scope) {
-    case SettingScope.User:
-      return USER_SETTINGS_PATH;
-    case SettingScope.Workspace:
-      return path.join(workspaceDir, SETTINGS_DIRECTORY_NAME, 'settings.json');
-    case SettingScope.System:
-      return getSystemSettingsPath();
-    default:
-      throw new Error(`Invalid scope: ${scope}`);
-  }
-}
