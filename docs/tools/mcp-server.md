@@ -647,27 +647,27 @@ While you can always configure MCP servers by manually editing your `settings.js
 The `add` command configures a new MCP server in your `settings.json`. Based on the scope (`-s, --scope`), it will be added to either the user config `~/.gemini/settings.json` or the project config `.gemini/settings.json` file.
 
 **Command:**
+
 ```bash
 gemini mcp add [options] <name> <commandOrUrl> [args...]
 ```
 
--   `<name>`: A unique name for the server.
--   `<commandOrUrl>`: The command to execute (for `stdio`) or the URL (for `http`/`sse`).
--   `[args...]`: Optional arguments for a `stdio` command.
+- `<name>`: A unique name for the server.
+- `<commandOrUrl>`: The command to execute (for `stdio`) or the URL (for `http`/`sse`).
+- `[args...]`: Optional arguments for a `stdio` command.
 
 **Options (Flags):**
 
--   `-s, --scope`: Configuration scope (user or project). [default: "project"]
--   `-t, --transport`: Transport type (stdio, sse, http). [default: "stdio"]
--   `-e, --env`: Set environment variables (e.g. -e KEY=value).
--   `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "Authorization: Bearer abc123").
--   `--timeout`: Set connection timeout in milliseconds.
--   `--trust`: Trust the server (bypass all tool call confirmation prompts).
+- `-s, --scope`: Configuration scope (user or project). [default: "project"]
+- `-t, --transport`: Transport type (stdio, sse, http). [default: "stdio"]
+- `-e, --env`: Set environment variables (e.g. -e KEY=value).
+- `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "Authorization: Bearer abc123").
+- `--timeout`: Set connection timeout in milliseconds.
+- `--trust`: Trust the server (bypass all tool call confirmation prompts).
 
 #### Adding an stdio server
 
 This is the default transport for running local servers.
-
 
 ```bash
 # Basic syntax
@@ -715,11 +715,13 @@ gemini mcp add --transport sse secure-sse https://api.example.com/sse/ --header 
 To view all MCP servers currently configured, use the `list` command. It displays each server's name, configuration details, and connection status.
 
 **Command:**
+
 ```bash
 gemini mcp list
 ```
 
 **Example Output:**
+
 ```sh
 ✓ stdio-server: command: python3 server.py (stdio) - Connected
 ✓ http-server: https://api.example.com/mcp (http) - Connected
@@ -731,13 +733,15 @@ gemini mcp list
 To delete a server from your configuration, use the `remove` command with the server's name.
 
 **Command:**
+
 ```bash
 gemini mcp remove <name>
 ```
 
 **Example:**
+
 ```bash
 gemini mcp remove my-server
 ```
-This will find and delete the "my-server" entry from the `mcpServers` object in the appropriate `settings.json` file based on the scope (`-s, --scope`).
 
+This will find and delete the "my-server" entry from the `mcpServers` object in the appropriate `settings.json` file based on the scope (`-s, --scope`).
