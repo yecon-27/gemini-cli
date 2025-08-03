@@ -1077,7 +1077,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
             errorCount={errorCount}
             showErrorDetails={showErrorDetails}
             showMemoryUsage={
-              config.getDebugMode() || config.getShowMemoryUsage()
+              config.getDebugMode() || settings.merged.showMemoryUsage || false
             }
             promptTokenCount={sessionStats.lastPromptTokenCount}
             nightly={nightly}
