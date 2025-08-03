@@ -11,7 +11,145 @@ import {
   getSettingsFilePath,
 } from '../config/settings.js';
 import * as fsp from 'fs/promises';
-import { MCPServerConfig } from '@google/gemini-cli-core';
+import {
+  MCPServerConfig,
+  getMCPServerStatus,
+  MCPServerStatus,
+  createTransport,
+} from '@google/gemini-cli-core';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { loadExtensions } from '../config/extension.js';
+
+const COLOR_GREEN = '\u001b[32m';
+const COLOR_YELLOW = '\u001b[33m';
+const COLOR_RED = '\u001b[31m';
+const RESET_COLOR = '\u001b[0m';
+
+async function getMcpServersFromConfig(): Promise<
+  Record<string, MCPServerConfig>
+> {
+  const settings = loadSettings(process.cwd());
+  const extensions = loadExtensions(process.cwd());
+  const mcpServers = { ...(settings.merged.mcpServers || {}) };
+  for (const extension of extensions) {
+    Object.entries(extension.config.mcpServers || {}).forEach(
+      ([key, server]) => {
+        if (mcpServers[key]) {
+          return;
+        }
+        mcpServers[key] = {
+          ...server,
+          extensionName: extension.config.name,
+        };
+      },
+    );
+  }
+  return mcpServers;
+}
+
+async function testMCPConnection(
+  serverName: string,
+  config: MCPServerConfig,
+): Promise<void> {
+  const client = new Client({
+    name: 'mcp-test-client',
+    version: '0.0.1',
+  });
+
+  try {
+    // Use the same transport creation logic as core
+    const transport = await createTransport(serverName, config, false);
+    
+    try {
+      // Attempt actual MCP connection with short timeout
+      await client.connect(transport, { timeout: 10000 }); // 10s timeout
+      
+      // Test basic MCP protocol by listing tools
+      await client.listTools();
+      
+      await client.close();
+    } catch (error) {
+      await transport.close();
+      throw error;
+    }
+  } catch (error) {
+    await client.close();
+    throw error;
+  }
+}
+
+async function getServerStatus(
+  serverName: string,
+  server: MCPServerConfig,
+): Promise<MCPServerStatus> {
+  // For stdio servers, use existing logic which tracks actual connection state
+  if (server.command) {
+    return getMCPServerStatus(serverName);
+  }
+  
+  // For HTTP/SSE servers, do proper MCP connection test
+  try {
+    await testMCPConnection(serverName, server);
+    return MCPServerStatus.CONNECTED;
+  } catch (error) {
+    return MCPServerStatus.DISCONNECTED;
+  }
+}
+
+async function listMcpServers(): Promise<void> {
+  const mcpServers = await getMcpServersFromConfig();
+  const serverNames = Object.keys(mcpServers);
+
+  if (serverNames.length === 0) {
+    console.log('No MCP servers configured.');
+    return;
+  }
+
+  console.log('Configured MCP servers:\n');
+
+  for (const serverName of serverNames) {
+    const server = mcpServers[serverName];
+    
+    let status: MCPServerStatus;
+    let errorDetails: string | null = null;
+    
+    try {
+      status = await getServerStatus(serverName, server);
+    } catch (error) {
+      status = MCPServerStatus.DISCONNECTED;
+      errorDetails = String(error);
+    }
+
+    let statusIndicator = '';
+    let statusText = '';
+    switch (status) {
+      case MCPServerStatus.CONNECTED:
+        statusIndicator = COLOR_GREEN + '✓' + RESET_COLOR;
+        statusText = 'Connected';
+        break;
+      case MCPServerStatus.CONNECTING:
+        statusIndicator = COLOR_YELLOW + '…' + RESET_COLOR;
+        statusText = 'Connecting';
+        break;
+      case MCPServerStatus.DISCONNECTED:
+      default:
+        statusIndicator = COLOR_RED + '✗' + RESET_COLOR;
+        statusText = 'Disconnected';
+        break;
+    }
+
+    let serverInfo = `${serverName}: `;
+    if (server.httpUrl) {
+      serverInfo += `${server.httpUrl} (HTTP)`;
+    } else if (server.url) {
+      serverInfo += `${server.url} (SSE)`;
+    } else if (server.command) {
+      serverInfo += `command: ${server.command} ${server.args?.join(' ') || ''} (stdio)`;
+    }
+
+    console.log(`${statusIndicator} ${serverInfo} - ${statusText}`);
+  }
+}
 
 async function addMcpServer(
   name: string,
@@ -80,7 +218,9 @@ async function addMcpServer(
 
   const isExistingServer = !!mcpServers[name];
   if (isExistingServer) {
-    console.log(`Server "${name}" is already configured, updating configuration.`);
+    console.log(
+      `MCP server "${name}" is already configured within ${scope} settings.`,
+    );
   }
 
   mcpServers[name] = newServer as MCPServerConfig;
@@ -94,9 +234,11 @@ async function addMcpServer(
   await fsp.writeFile(settingsPath, JSON.stringify(jsonContent, null, 2));
 
   if (isExistingServer) {
-    console.log(`Server "${name}" updated in ${scope} settings.`);
+    console.log(`MCP server "${name}" updated in ${scope} settings.`);
   } else {
-    console.log(`Server "${name}" added to ${scope} settings.`);
+    console.log(
+      `MCP server "${name}" added to ${scope} settings. (${transport})`,
+    );
   }
 }
 
@@ -218,6 +360,15 @@ const removeCommand: CommandModule = {
   },
 };
 
+const listCommand: CommandModule = {
+  command: 'list',
+  describe: 'List all configured MCP servers',
+  handler: async () => {
+    await listMcpServers();
+    process.exit(0);
+  },
+};
+
 export const mcpCommand: CommandModule = {
   command: 'mcp',
   describe: 'Manage MCP servers',
@@ -225,6 +376,7 @@ export const mcpCommand: CommandModule = {
     yargs
       .command(addCommand)
       .command(removeCommand)
+      .command(listCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {
