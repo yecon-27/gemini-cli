@@ -73,6 +73,7 @@ export function useCommandCompletion(
 
   const completionStart = useRef(-1);
   const completionEnd = useRef(-1);
+  const isMountedRef = useRef(true);
 
   const fetchArgumentSuggestions = useCallback(
     async (leafCommand: SlashCommand, argString: string) => {
@@ -117,12 +118,7 @@ export function useCommandCompletion(
   );
 
   const fetchSuggestions = useCallback(
-    async (
-      partialPath: string,
-      prefix: string,
-      baseDirRelative: string,
-      isMountedRef: { current: boolean },
-    ) => {
+    async (partialPath: string, prefix: string, baseDirRelative: string) => {
       setIsLoadingSuggestions(true);
       let fetchedSuggestions: Suggestion[] = [];
 
@@ -551,16 +547,14 @@ export function useCommandCompletion(
         : partialPath.substring(lastSlashIndex + 1),
     );
 
-    let isMounted = true;
+    isMountedRef.current = true;
 
     const debounceTimeout = setTimeout(() => {
-      fetchSuggestions(partialPath, prefix, baseDirRelative, {
-        current: isMounted,
-      });
+      fetchSuggestions(partialPath, prefix, baseDirRelative);
     }, 100);
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
       clearTimeout(debounceTimeout);
     };
   }, [
