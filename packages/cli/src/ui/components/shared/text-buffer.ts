@@ -43,7 +43,7 @@ export const findNextWordStartInLine = (
   line: string,
   col: number,
 ): number | null => {
-  const chars = [...line]; // Handle Unicode properly
+  const chars = toCodePoints(line);
   let i = col;
 
   if (i >= chars.length) return null;
@@ -78,7 +78,7 @@ export const findPrevWordStartInLine = (
   line: string,
   col: number,
 ): number | null => {
-  const chars = [...line];
+  const chars = toCodePoints(line);
   let i = col;
 
   if (i <= 0) return null;
@@ -109,7 +109,7 @@ export const findPrevWordStartInLine = (
 
 // Find word end within a line
 export const findWordEndInLine = (line: string, col: number): number | null => {
-  const chars = [...line];
+  const chars = toCodePoints(line);
   let i = col;
 
   // If we're already at the end of a word, advance to next word
@@ -162,7 +162,7 @@ export const findNextWordAcrossLines = (
   // Search subsequent lines
   for (let row = cursorRow + 1; row < lines.length; row++) {
     const line = lines[row] || '';
-    const chars = [...line];
+    const chars = toCodePoints(line);
 
     // For empty lines, if we haven't found any words yet, return the empty line
     if (chars.length === 0) {
@@ -170,7 +170,7 @@ export const findNextWordAcrossLines = (
       let hasWordsInLaterLines = false;
       for (let laterRow = row + 1; laterRow < lines.length; laterRow++) {
         const laterLine = lines[laterRow] || '';
-        const laterChars = [...laterLine];
+        const laterChars = toCodePoints(laterLine);
         let firstNonWhitespace = 0;
         while (
           firstNonWhitespace < laterChars.length &&
@@ -233,7 +233,7 @@ export const findPrevWordAcrossLines = (
   // Search previous lines
   for (let row = cursorRow - 1; row >= 0; row--) {
     const line = lines[row] || '';
-    const chars = [...line];
+    const chars = toCodePoints(line);
 
     if (chars.length === 0) continue;
 

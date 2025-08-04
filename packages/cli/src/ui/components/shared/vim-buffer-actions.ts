@@ -16,7 +16,7 @@ import {
   findPrevWordAcrossLines,
   findWordEndInLine,
 } from './text-buffer.js';
-import { cpLen } from '../../utils/textUtils.js';
+import { cpLen, toCodePoints } from '../../utils/textUtils.js';
 
 export type VimAction = Extract<
   TextBufferAction,
@@ -542,7 +542,7 @@ export function handleVimAction(
         // Special handling for the first iteration when we're at end of word
         if (i === 0) {
           const currentLine = lines[row] || '';
-          const lineCodePoints = [...currentLine];
+          const lineCodePoints = toCodePoints(currentLine);
           const atEndOfWord =
             col < lineCodePoints.length &&
             isWordCharStrict(lineCodePoints[col]) &&
@@ -675,7 +675,7 @@ export function handleVimAction(
       let col = 0;
 
       // Find first non-whitespace character using proper Unicode handling
-      const lineCodePoints = [...currentLine]; // Proper Unicode iteration
+      const lineCodePoints = toCodePoints(currentLine);
       while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
         col++;
       }
@@ -712,7 +712,7 @@ export function handleVimAction(
       let col = 0;
 
       // Find first non-whitespace character using proper Unicode handling
-      const lineCodePoints = [...currentLine]; // Proper Unicode iteration
+      const lineCodePoints = toCodePoints(currentLine);
       while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
         col++;
       }
