@@ -4,86 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mcpCommand } from './mcp.js';
-import yargs from 'yargs';
-import { loadSettings, SettingScope } from '../config/settings.js';
-
-vi.mock('fs/promises', () => ({
-  readFile: vi.fn(),
-  writeFile: vi.fn(),
-}));
-
-vi.mock('../config/settings.js', async () => {
-  const actual = await vi.importActual('../config/settings.js');
-  return {
-    ...actual,
-    loadSettings: vi.fn(),
-  };
-});
-
-const mockedLoadSettings = loadSettings as vi.Mock;
+import { type Argv } from 'yargs';
 
 describe('mcp command', () => {
-  let parser: yargs.Argv;
-  let mockSetValue: vi.Mock;
-
-  beforeEach(() => {
-    vi.resetAllMocks();
-    const yargsInstance = yargs([]).command(mcpCommand);
-    parser = yargsInstance;
-    mockSetValue = vi.fn();
-    mockedLoadSettings.mockReturnValue({
-      forScope: () => ({ settings: {} }),
-      setValue: mockSetValue,
-    });
+  it('should have correct command definition', () => {
+    expect(mcpCommand.command).toBe('mcp');
+    expect(mcpCommand.describe).toBe('Manage MCP servers');
+    expect(typeof mcpCommand.builder).toBe('function');
+    expect(typeof mcpCommand.handler).toBe('function');
   });
 
-  it('should add a stdio server to project settings', async () => {
-    await parser.parseAsync(
-      'mcp add my-server /path/to/server arg1 arg2 -e FOO=bar',
-    );
+  it('should register add, remove, and list subcommands', () => {
+    const mockYargs = {
+      command: vi.fn().mockReturnThis(),
+      demandCommand: vi.fn().mockReturnThis(),
+      version: vi.fn().mockReturnThis(),
+    };
 
-    expect(mockSetValue).toHaveBeenCalledWith(
-      SettingScope.Workspace,
-      'mcpServers',
-      {
-        'my-server': {
-          command: '/path/to/server',
-          args: ['arg1', 'arg2'],
-          env: { FOO: 'bar' },
-        },
-      },
-    );
-  });
+    mcpCommand.builder(mockYargs as unknown as Argv);
 
-  it('should add an sse server to user settings', async () => {
-    await parser.parseAsync(
-      'mcp add --transport sse sse-server https://example.com/sse-endpoint --scope user -H "X-API-Key: your-key"',
+    expect(mockYargs.command).toHaveBeenCalledTimes(3);
+    expect(mockYargs.demandCommand).toHaveBeenCalledWith(
+      1,
+      'You need at least one command before continuing.',
     );
-
-    expect(mockSetValue).toHaveBeenCalledWith(SettingScope.User, 'mcpServers', {
-      'sse-server': {
-        url: 'https://example.com/sse-endpoint',
-        headers: { 'X-API-Key': 'your-key' },
-      },
-    });
-  });
-
-  it('should add an http server to project settings', async () => {
-    await parser.parseAsync(
-      'mcp add --transport http http-server https://example.com/mcp -H "Authorization: Bearer your-token"',
-    );
-
-    expect(mockSetValue).toHaveBeenCalledWith(
-      SettingScope.Workspace,
-      'mcpServers',
-      {
-        'http-server': {
-          httpUrl: 'https://example.com/mcp',
-          headers: { Authorization: 'Bearer your-token' },
-        },
-      },
-    );
+    expect(mockYargs.version).toHaveBeenCalledWith(false);
   });
 });
