@@ -7,14 +7,12 @@
 import { useEffect, useCallback, useMemo, useRef } from 'react';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { glob } from 'glob';
 import {
   isNodeError,
   escapePath,
   unescapePath,
   getErrorMessage,
   Config,
-  FileDiscoveryService,
   DEFAULT_FILE_FILTERING_OPTIONS,
   SHELL_SPECIAL_CHARS,
 } from '@google/gemini-cli-core';
@@ -26,6 +24,7 @@ import {
 } from '../components/shared/text-buffer.js';
 import { isSlashCommand } from '../utils/commandUtils.js';
 import { toCodePoints } from '../utils/textUtils.js';
+import { findFilesRecursively, findFilesWithGlob } from '../utils/fileUtils.js';
 import { useCompletion } from './useCompletion.js';
 
 export interface UseCommandCompletionReturn {
@@ -75,361 +74,55 @@ export function useCommandCompletion(
   const completionStart = useRef(-1);
   const completionEnd = useRef(-1);
 
-  const cursorRow = buffer.cursor[0];
-  const cursorCol = buffer.cursor[1];
-
-  // Check if cursor is after @ or / without unescaped spaces
-  const commandIndex = useMemo(() => {
-    const currentLine = buffer.lines[cursorRow] || '';
-    if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
-      return currentLine.indexOf('/');
-    }
-
-    // For other completions like '@', we search backwards from the cursor.
-
-    const codePoints = toCodePoints(currentLine);
-    for (let i = cursorCol - 1; i >= 0; i--) {
-      const char = codePoints[i];
-
-      if (char === ' ') {
-        // Check for unescaped spaces.
-        let backslashCount = 0;
-        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
-          backslashCount++;
-        }
-        if (backslashCount % 2 === 0) {
-          return -1; // Inactive on unescaped space.
-        }
-      } else if (char === '@') {
-        // Active if we find an '@' before any unescaped space.
-        return i;
-      }
-    }
-
-    return -1;
-  }, [cursorRow, cursorCol, buffer.lines]);
-
-  useEffect(() => {
-    if (commandIndex === -1 || reverseSearchActive) {
-      setTimeout(resetCompletionState, 0);
-      return;
-    }
-
-    const currentLine = buffer.lines[cursorRow] || '';
-    const codePoints = toCodePoints(currentLine);
-
-    if (codePoints[commandIndex] === '/') {
-      // Always reset perfect match at the beginning of processing.
-      setIsPerfectMatch(false);
-
-      const fullPath = currentLine.substring(commandIndex + 1);
-      const hasTrailingSpace = currentLine.endsWith(' ');
-
-      // Get all non-empty parts of the command.
-      const rawParts = fullPath.split(/\s+/).filter((p) => p);
-
-      let commandPathParts = rawParts;
-      let partial = '';
-
-      // If there's no trailing space, the last part is potentially a partial segment.
-      // We tentatively separate it.
-      if (!hasTrailingSpace && rawParts.length > 0) {
-        partial = rawParts[rawParts.length - 1];
-        commandPathParts = rawParts.slice(0, -1);
-      }
-
-      // Traverse the Command Tree using the tentative completed path
-      let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
-      let leafCommand: SlashCommand | null = null;
-
-      for (const part of commandPathParts) {
-        if (!currentLevel) {
-          leafCommand = null;
-          currentLevel = [];
-          break;
-        }
-        const found: SlashCommand | undefined = currentLevel.find(
-          (cmd) => cmd.name === part || cmd.altNames?.includes(part),
-        );
-        if (found) {
-          leafCommand = found;
-          currentLevel = found.subCommands as
-            | readonly SlashCommand[]
-            | undefined;
-        } else {
-          leafCommand = null;
-          currentLevel = [];
-          break;
-        }
-      }
-
-      let exactMatchAsParent: SlashCommand | undefined;
-      // Handle the Ambiguous Case
-      if (!hasTrailingSpace && currentLevel) {
-        exactMatchAsParent = currentLevel.find(
-          (cmd) =>
-            (cmd.name === partial || cmd.altNames?.includes(partial)) &&
-            cmd.subCommands,
-        );
-
-        if (exactMatchAsParent) {
-          // It's a perfect match for a parent command. Override our initial guess.
-          // Treat it as a completed command path.
-          leafCommand = exactMatchAsParent;
-          currentLevel = exactMatchAsParent.subCommands;
-          partial = ''; // We now want to suggest ALL of its sub-commands.
-        }
-      }
-
-      // Check for perfect, executable match
-      if (!hasTrailingSpace) {
-        if (leafCommand && partial === '' && leafCommand.action) {
-          // Case: /command<enter> - command has action, no sub-commands were suggested
-          setIsPerfectMatch(true);
-        } else if (currentLevel) {
-          // Case: /command subcommand<enter>
-          const perfectMatch = currentLevel.find(
-            (cmd) =>
-              (cmd.name === partial || cmd.altNames?.includes(partial)) &&
-              cmd.action,
-          );
-          if (perfectMatch) {
-            setIsPerfectMatch(true);
-          }
-        }
-      }
-
-      const depth = commandPathParts.length;
-      const isArgumentCompletion =
-        leafCommand?.completion &&
-        (hasTrailingSpace ||
-          (rawParts.length > depth && depth > 0 && partial !== ''));
-
-      // Set completion range
-      if (hasTrailingSpace || exactMatchAsParent) {
-        completionStart.current = currentLine.length;
-        completionEnd.current = currentLine.length;
-      } else if (partial) {
-        if (isArgumentCompletion) {
-          const commandSoFar = `/${commandPathParts.join(' ')}`;
-          const argStartIndex =
-            commandSoFar.length + (commandPathParts.length > 0 ? 1 : 0);
-          completionStart.current = argStartIndex;
-        } else {
-          completionStart.current = currentLine.length - partial.length;
-        }
-        completionEnd.current = currentLine.length;
-      } else {
-        // e.g. /
-        completionStart.current = commandIndex + 1;
-        completionEnd.current = currentLine.length;
-      }
-
-      // Provide Suggestions based on the now-corrected context
-      if (isArgumentCompletion) {
-        const fetchAndSetSuggestions = async () => {
-          setIsLoadingSuggestions(true);
-          const argString = rawParts.slice(depth).join(' ');
-          const results =
-            (await leafCommand!.completion!(commandContext, argString)) || [];
-          const finalSuggestions = results.map((s) => ({ label: s, value: s }));
-          setSuggestions(finalSuggestions);
-          setShowSuggestions(finalSuggestions.length > 0);
-          setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
-          setIsLoadingSuggestions(false);
-        };
-        fetchAndSetSuggestions();
-        return;
-      }
-
-      // Command/Sub-command Completion
-      const commandsToSearch = currentLevel || [];
-      if (commandsToSearch.length > 0) {
-        let potentialSuggestions = commandsToSearch.filter(
-          (cmd) =>
-            cmd.description &&
-            (cmd.name.startsWith(partial) ||
-              cmd.altNames?.some((alt) => alt.startsWith(partial))),
-        );
-
-        // If a user's input is an exact match and it is a leaf command,
-        // enter should submit immediately.
-        if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
-          const perfectMatch = potentialSuggestions.find(
-            (s) => s.name === partial || s.altNames?.includes(partial),
-          );
-          if (perfectMatch && perfectMatch.action) {
-            potentialSuggestions = [];
-          }
-        }
-
-        const finalSuggestions = potentialSuggestions.map((cmd) => ({
-          label: cmd.name,
-          value: cmd.name,
-          description: cmd.description,
-        }));
-
+  const fetchArgumentSuggestions = useCallback(
+    async (leafCommand: SlashCommand, argString: string) => {
+      setIsLoadingSuggestions(true);
+      try {
+        const results =
+          (await leafCommand.completion!(commandContext, argString)) || [];
+        const finalSuggestions = results.map((s) => ({ label: s, value: s }));
         setSuggestions(finalSuggestions);
         setShowSuggestions(finalSuggestions.length > 0);
         setActiveSuggestionIndex(finalSuggestions.length > 0 ? 0 : -1);
+      } catch (error) {
+        console.error('Error fetching argument suggestions:', error);
+        resetCompletionState();
+      } finally {
         setIsLoadingSuggestions(false);
-        return;
       }
+    },
+    [
+      commandContext,
+      setSuggestions,
+      setShowSuggestions,
+      setActiveSuggestionIndex,
+      setIsLoadingSuggestions,
+      resetCompletionState,
+    ],
+  );
 
-      // If we fall through, no suggestions are available.
-      resetCompletionState();
-      return;
-    }
+  const setSuggestionState = useCallback(
+    (suggestions: Suggestion[], loading: boolean = false) => {
+      setSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+      setActiveSuggestionIndex(suggestions.length > 0 ? 0 : -1);
+      setIsLoadingSuggestions(loading);
+    },
+    [
+      setSuggestions,
+      setShowSuggestions,
+      setActiveSuggestionIndex,
+      setIsLoadingSuggestions,
+    ],
+  );
 
-    // Handle At Command Completion
-    completionEnd.current = codePoints.length;
-    for (let i = cursorCol; i < codePoints.length; i++) {
-      if (codePoints[i] === ' ') {
-        let backslashCount = 0;
-        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
-          backslashCount++;
-        }
-
-        if (backslashCount % 2 === 0) {
-          completionEnd.current = i;
-          break;
-        }
-      }
-    }
-
-    const pathStart = commandIndex + 1;
-    const partialPath = currentLine.substring(pathStart, completionEnd.current);
-    const lastSlashIndex = partialPath.lastIndexOf('/');
-    completionStart.current =
-      lastSlashIndex === -1 ? pathStart : pathStart + lastSlashIndex + 1;
-    const baseDirRelative =
-      lastSlashIndex === -1
-        ? '.'
-        : partialPath.substring(0, lastSlashIndex + 1);
-    const prefix = unescapePath(
-      lastSlashIndex === -1
-        ? partialPath
-        : partialPath.substring(lastSlashIndex + 1),
-    );
-
-    let isMounted = true;
-
-    const findFilesRecursively = async (
-      startDir: string,
-      searchPrefix: string,
-      fileDiscovery: FileDiscoveryService | null,
-      filterOptions: {
-        respectGitIgnore?: boolean;
-        respectGeminiIgnore?: boolean;
-      },
-      currentRelativePath = '',
-      depth = 0,
-      maxDepth = 10, // Limit recursion depth
-      maxResults = 50, // Limit number of results
-    ): Promise<Suggestion[]> => {
-      if (depth > maxDepth) {
-        return [];
-      }
-
-      const lowerSearchPrefix = searchPrefix.toLowerCase();
-      let foundSuggestions: Suggestion[] = [];
-      try {
-        const entries = await fs.readdir(startDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (foundSuggestions.length >= maxResults) break;
-
-          const entryPathRelative = path.join(currentRelativePath, entry.name);
-          const entryPathFromRoot = path.relative(
-            startDir,
-            path.join(startDir, entry.name),
-          );
-
-          // Conditionally ignore dotfiles
-          if (!searchPrefix.startsWith('.') && entry.name.startsWith('.')) {
-            continue;
-          }
-
-          // Check if this entry should be ignored by filtering options
-          if (
-            fileDiscovery &&
-            fileDiscovery.shouldIgnoreFile(entryPathFromRoot, filterOptions)
-          ) {
-            continue;
-          }
-
-          if (entry.name.toLowerCase().startsWith(lowerSearchPrefix)) {
-            foundSuggestions.push({
-              label: entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              value: escapePath(
-                entryPathRelative + (entry.isDirectory() ? '/' : ''),
-              ),
-            });
-          }
-          if (
-            entry.isDirectory() &&
-            entry.name !== 'node_modules' &&
-            !entry.name.startsWith('.')
-          ) {
-            if (foundSuggestions.length < maxResults) {
-              foundSuggestions = foundSuggestions.concat(
-                await findFilesRecursively(
-                  path.join(startDir, entry.name),
-                  searchPrefix, // Pass original searchPrefix for recursive calls
-                  fileDiscovery,
-                  filterOptions,
-                  entryPathRelative,
-                  depth + 1,
-                  maxDepth,
-                  maxResults - foundSuggestions.length,
-                ),
-              );
-            }
-          }
-        }
-      } catch (_err) {
-        // Ignore errors like permission denied or ENOENT during recursive search
-      }
-      return foundSuggestions.slice(0, maxResults);
-    };
-
-    const findFilesWithGlob = async (
-      searchPrefix: string,
-      fileDiscoveryService: FileDiscoveryService,
-      filterOptions: {
-        respectGitIgnore?: boolean;
-        respectGeminiIgnore?: boolean;
-      },
-      searchDir: string,
-      maxResults = 50,
-    ): Promise<Suggestion[]> => {
-      const globPattern = `**/${searchPrefix}*`;
-      const files = await glob(globPattern, {
-        cwd: searchDir,
-        dot: searchPrefix.startsWith('.'),
-        nocase: true,
-      });
-
-      const suggestions: Suggestion[] = files
-        .filter((file) => {
-          if (fileDiscoveryService) {
-            return !fileDiscoveryService.shouldIgnoreFile(file, filterOptions);
-          }
-          return true;
-        })
-        .map((file: string) => {
-          const absolutePath = path.resolve(searchDir, file);
-          const label = path.relative(cwd, absolutePath);
-          return {
-            label,
-            value: escapePath(label),
-          };
-        })
-        .slice(0, maxResults);
-
-      return suggestions;
-    };
-
-    const fetchSuggestions = async () => {
+  const fetchSuggestions = useCallback(
+    async (
+      partialPath: string,
+      prefix: string,
+      baseDirRelative: string,
+      isMountedRef: { current: boolean },
+    ) => {
       setIsLoadingSuggestions(true);
       let fetchedSuggestions: Suggestion[] = [];
 
@@ -454,6 +147,7 @@ export function useCommandCompletion(
                 fileDiscoveryService,
                 filterOptions,
                 dir,
+                cwd,
               );
             } else {
               fetchedSuggestionsPerDir = await findFilesRecursively(
@@ -497,16 +191,19 @@ export function useCommandCompletion(
               filteredEntries.push(entry);
             }
 
-            fetchedSuggestionsPerDir = filteredEntries.map((entry) => {
+            // Pre-allocate array and use for loop for better performance
+            fetchedSuggestionsPerDir = new Array(filteredEntries.length);
+            for (let i = 0; i < filteredEntries.length; i++) {
+              const entry = filteredEntries[i];
               const absolutePath = path.resolve(baseDirAbsolute, entry.name);
               const label =
                 cwd === dir ? entry.name : path.relative(cwd, absolutePath);
               const suggestionLabel = entry.isDirectory() ? label + '/' : label;
-              return {
+              fetchedSuggestionsPerDir[i] = {
                 label: suggestionLabel,
                 value: escapePath(suggestionLabel),
               };
-            });
+            }
           }
           fetchedSuggestions = [
             ...fetchedSuggestions,
@@ -556,7 +253,7 @@ export function useCommandCompletion(
           );
         });
 
-        if (isMounted) {
+        if (isMountedRef.current) {
           setSuggestions(fetchedSuggestions);
           setShowSuggestions(fetchedSuggestions.length > 0);
           setActiveSuggestionIndex(fetchedSuggestions.length > 0 ? 0 : -1);
@@ -564,7 +261,7 @@ export function useCommandCompletion(
         }
       } catch (error: unknown) {
         if (isNodeError(error) && error.code === 'ENOENT') {
-          if (isMounted) {
+          if (isMountedRef.current) {
             setSuggestions([]);
             setShowSuggestions(false);
           }
@@ -572,41 +269,311 @@ export function useCommandCompletion(
           console.error(
             `Error fetching completion suggestions for ${partialPath}: ${getErrorMessage(error)}`,
           );
-          if (isMounted) {
+          if (isMountedRef.current) {
             resetCompletionState();
           }
         }
       }
-      if (isMounted) {
+      if (isMountedRef.current) {
         setIsLoadingSuggestions(false);
       }
-    };
+    },
+    [
+      config,
+      dirs,
+      cwd,
+      setSuggestions,
+      setShowSuggestions,
+      setActiveSuggestionIndex,
+      setVisibleStartIndex,
+      setIsLoadingSuggestions,
+      resetCompletionState,
+    ],
+  );
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 100);
+  const cursorRow = buffer.cursor[0];
+  const cursorCol = buffer.cursor[1];
+
+  // Check if cursor is after @ or / without unescaped spaces
+  const commandIndex = useMemo(() => {
+    const currentLine = buffer.lines[cursorRow] || '';
+    if (cursorRow === 0 && isSlashCommand(currentLine.trim())) {
+      return currentLine.indexOf('/');
+    }
+
+    // For other completions like '@', we search backwards from the cursor.
+
+    const codePoints = toCodePoints(currentLine);
+    for (let i = cursorCol - 1; i >= 0; i--) {
+      const char = codePoints[i];
+
+      if (char === ' ') {
+        // Check for unescaped spaces.
+        let backslashCount = 0;
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+        if (backslashCount % 2 === 0) {
+          return -1; // Inactive on unescaped space.
+        }
+      } else if (char === '@') {
+        // Active if we find an '@' before any unescaped space.
+        return i;
+      }
+    }
+
+    return -1;
+  }, [cursorRow, cursorCol, buffer.lines]);
+
+  // Handle slash command completion
+  useEffect(() => {
+    if (commandIndex === -1 || reverseSearchActive) {
+      setTimeout(resetCompletionState, 0);
+      return;
+    }
+
+    const currentLine = buffer.lines[cursorRow] || '';
+    const codePoints = toCodePoints(currentLine);
+
+    if (codePoints[commandIndex] !== '/') {
+      return;
+    }
+
+    // Early return if no slash commands available
+    if (!slashCommands || slashCommands.length === 0) {
+      resetCompletionState();
+      return;
+    }
+    // Always reset perfect match at the beginning of processing.
+    setIsPerfectMatch(false);
+
+    const fullPath = currentLine.substring(commandIndex + 1);
+    const hasTrailingSpace = currentLine.endsWith(' ');
+
+    // Get all non-empty parts of the command.
+    const rawParts = fullPath.split(/\s+/).filter((p) => p);
+
+    let commandPathParts = rawParts;
+    let partial = '';
+
+    // If there's no trailing space, the last part is potentially a partial segment.
+    // We tentatively separate it.
+    if (!hasTrailingSpace && rawParts.length > 0) {
+      partial = rawParts[rawParts.length - 1];
+      commandPathParts = rawParts.slice(0, -1);
+    }
+
+    // Traverse the Command Tree using the tentative completed path
+    let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
+    let leafCommand: SlashCommand | null = null;
+
+    for (const part of commandPathParts) {
+      if (!currentLevel) {
+        leafCommand = null;
+        currentLevel = [];
+        break;
+      }
+      const found: SlashCommand | undefined = currentLevel.find(
+        (cmd) => cmd.name === part || cmd.altNames?.includes(part),
+      );
+      if (found) {
+        leafCommand = found;
+        currentLevel = found.subCommands as readonly SlashCommand[] | undefined;
+      } else {
+        leafCommand = null;
+        currentLevel = [];
+        break;
+      }
+    }
+
+    let exactMatchAsParent: SlashCommand | undefined;
+    // Handle the Ambiguous Case
+    if (!hasTrailingSpace && currentLevel) {
+      exactMatchAsParent = currentLevel.find(
+        (cmd) =>
+          (cmd.name === partial || cmd.altNames?.includes(partial)) &&
+          cmd.subCommands,
+      );
+
+      if (exactMatchAsParent) {
+        // It's a perfect match for a parent command. Override our initial guess.
+        // Treat it as a completed command path.
+        leafCommand = exactMatchAsParent;
+        currentLevel = exactMatchAsParent.subCommands;
+        partial = ''; // We now want to suggest ALL of its sub-commands.
+      }
+    }
+
+    // Check for perfect, executable match
+    if (!hasTrailingSpace) {
+      if (leafCommand && partial === '' && leafCommand.action) {
+        // Case: /command<enter> - command has action, no sub-commands were suggested
+        setIsPerfectMatch(true);
+      } else if (currentLevel) {
+        // Case: /command subcommand<enter>
+        const perfectMatch = currentLevel.find(
+          (cmd) =>
+            (cmd.name === partial || cmd.altNames?.includes(partial)) &&
+            cmd.action,
+        );
+        if (perfectMatch) {
+          setIsPerfectMatch(true);
+        }
+      }
+    }
+
+    const depth = commandPathParts.length;
+    const isArgumentCompletion =
+      leafCommand?.completion &&
+      (hasTrailingSpace ||
+        (rawParts.length > depth && depth > 0 && partial !== ''));
+
+    // Set completion range
+    if (hasTrailingSpace || exactMatchAsParent) {
+      completionStart.current = currentLine.length;
+      completionEnd.current = currentLine.length;
+    } else if (partial) {
+      if (isArgumentCompletion) {
+        const commandSoFar = `/${commandPathParts.join(' ')}`;
+        const argStartIndex =
+          commandSoFar.length + (commandPathParts.length > 0 ? 1 : 0);
+        completionStart.current = argStartIndex;
+      } else {
+        completionStart.current = currentLine.length - partial.length;
+      }
+      completionEnd.current = currentLine.length;
+    } else {
+      // e.g. /
+      completionStart.current = commandIndex + 1;
+      completionEnd.current = currentLine.length;
+    }
+
+    // Provide Suggestions based on the now-corrected context
+    if (isArgumentCompletion) {
+      const argString = rawParts.slice(depth).join(' ');
+      fetchArgumentSuggestions(leafCommand!, argString);
+      return;
+    }
+
+    // Command/Sub-command Completion
+    const commandsToSearch = currentLevel || [];
+    if (commandsToSearch.length === 0) {
+      resetCompletionState();
+      return;
+    }
+
+    let potentialSuggestions = commandsToSearch.filter(
+      (cmd) =>
+        cmd.description &&
+        (cmd.name.startsWith(partial) ||
+          cmd.altNames?.some((alt) => alt.startsWith(partial))),
+    );
+
+    // Early return if no matching suggestions
+    if (potentialSuggestions.length === 0) {
+      resetCompletionState();
+      return;
+    }
+
+    // If a user's input is an exact match and it is a leaf command,
+    // enter should submit immediately.
+    if (potentialSuggestions.length > 0 && !hasTrailingSpace) {
+      const perfectMatch = potentialSuggestions.find(
+        (s) => s.name === partial || s.altNames?.includes(partial),
+      );
+      if (perfectMatch && perfectMatch.action) {
+        potentialSuggestions = [];
+      }
+    }
+
+    const finalSuggestions = potentialSuggestions.map((cmd) => ({
+      label: cmd.name,
+      value: cmd.name,
+      description: cmd.description,
+    }));
+
+    setSuggestionState(finalSuggestions);
+  }, [
+    commandIndex,
+    reverseSearchActive,
+    buffer.lines,
+    cursorRow,
+    slashCommands,
+    commandContext,
+    setSuggestionState,
+    setIsPerfectMatch,
+    resetCompletionState,
+    fetchArgumentSuggestions,
+  ]);
+
+  // Handle at command completion (file paths)
+  useEffect(() => {
+    if (commandIndex === -1 || reverseSearchActive) {
+      setTimeout(resetCompletionState, 0);
+      return;
+    }
+
+    const currentLine = buffer.lines[cursorRow] || '';
+    const codePoints = toCodePoints(currentLine);
+
+    if (codePoints[commandIndex] !== '@') {
+      return;
+    }
+
+    // Handle At Command Completion
+    completionEnd.current = codePoints.length;
+    for (let i = cursorCol; i < codePoints.length; i++) {
+      if (codePoints[i] === ' ') {
+        let backslashCount = 0;
+        for (let j = i - 1; j >= 0 && codePoints[j] === '\\'; j--) {
+          backslashCount++;
+        }
+
+        if (backslashCount % 2 === 0) {
+          completionEnd.current = i;
+          break;
+        }
+      }
+    }
+
+    const pathStart = commandIndex + 1;
+    const partialPath = currentLine.substring(pathStart, completionEnd.current);
+    const lastSlashIndex = partialPath.lastIndexOf('/');
+    completionStart.current =
+      lastSlashIndex === -1 ? pathStart : pathStart + lastSlashIndex + 1;
+    const baseDirRelative =
+      lastSlashIndex === -1
+        ? '.'
+        : partialPath.substring(0, lastSlashIndex + 1);
+    const prefix = unescapePath(
+      lastSlashIndex === -1
+        ? partialPath
+        : partialPath.substring(lastSlashIndex + 1),
+    );
+
+    let isMounted = true;
+
+    const debounceTimeout = setTimeout(() => {
+      fetchSuggestions(partialPath, prefix, baseDirRelative, {
+        current: isMounted,
+      });
+    }, 100);
 
     return () => {
       isMounted = false;
       clearTimeout(debounceTimeout);
     };
   }, [
-    buffer.text,
+    commandIndex,
+    reverseSearchActive,
+    buffer.lines,
     cursorRow,
     cursorCol,
-    buffer.lines,
     dirs,
     cwd,
-    commandIndex,
-    resetCompletionState,
-    slashCommands,
-    commandContext,
     config,
-    reverseSearchActive,
-    setSuggestions,
-    setShowSuggestions,
-    setActiveSuggestionIndex,
-    setIsLoadingSuggestions,
-    setIsPerfectMatch,
-    setVisibleStartIndex,
+    fetchSuggestions,
+    resetCompletionState,
   ]);
 
   const handleAutocomplete = useCallback(
