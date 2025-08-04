@@ -664,6 +664,9 @@ gemini mcp add [options] <name> <commandOrUrl> [args...]
 - `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g. -H "X-Api-Key: abc123" -H "Authorization: Bearer abc123").
 - `--timeout`: Set connection timeout in milliseconds.
 - `--trust`: Trust the server (bypass all tool call confirmation prompts).
+- `--description`: Set the description for the server.
+- `--include-tools`: A comma-separated list of tools to include.
+- `--exclude-tools`: A comma-separated list of tools to exclude.
 
 #### Adding an stdio server
 

@@ -19,9 +19,22 @@ async function addMcpServer(
     header: string[] | undefined;
     timeout?: number;
     trust?: boolean;
+    description?: string;
+    includeTools?: string[];
+    excludeTools?: string[];
   },
 ) {
-  const { scope, transport, env, header, timeout, trust } = options;
+  const {
+    scope,
+    transport,
+    env,
+    header,
+    timeout,
+    trust,
+    description,
+    includeTools,
+    excludeTools,
+  } = options;
   const settingsScope =
     scope === 'user' ? SettingScope.User : SettingScope.Workspace;
   const settings = loadSettings(process.cwd());
@@ -47,6 +60,9 @@ async function addMcpServer(
         headers,
         timeout,
         trust,
+        description,
+        includeTools,
+        excludeTools,
       };
       break;
     case 'http':
@@ -55,6 +71,9 @@ async function addMcpServer(
         headers,
         timeout,
         trust,
+        description,
+        includeTools,
+        excludeTools,
       };
       break;
     case 'stdio':
@@ -74,6 +93,9 @@ async function addMcpServer(
         ),
         timeout,
         trust,
+        description,
+        includeTools,
+        excludeTools,
       };
       break;
   }
@@ -152,6 +174,20 @@ export const addCommand: CommandModule = {
         describe:
           'Trust the server (bypass all tool call confirmation prompts)',
         type: 'boolean',
+      })
+      .option('description', {
+        describe: 'Set the description for the server',
+        type: 'string',
+      })
+      .option('include-tools', {
+        describe: 'A comma-separated list of tools to include',
+        type: 'array',
+        string: true,
+      })
+      .option('exclude-tools', {
+        describe: 'A comma-separated list of tools to exclude',
+        type: 'array',
+        string: true,
       }),
   handler: async (argv) => {
     await addMcpServer(
@@ -165,6 +201,9 @@ export const addCommand: CommandModule = {
         header: argv.header as string[],
         timeout: argv.timeout as number | undefined,
         trust: argv.trust as boolean | undefined,
+        description: argv.description as string | undefined,
+        includeTools: argv.includeTools as string[] | undefined,
+        excludeTools: argv.excludeTools as string[] | undefined,
       },
     );
   },
