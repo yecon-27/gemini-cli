@@ -456,7 +456,7 @@ export class GeminiClient {
           prompt_id,
           turn.finishReason?.toString() || '',
           nextSpeakerCheck?.next_speaker || '',
-          JSON.stringify(turn.lastResponse),
+          JSON.stringify(turn.lastResponses),
         ),
       );
       if (nextSpeakerCheck?.next_speaker === 'model') {
