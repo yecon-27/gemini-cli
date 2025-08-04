@@ -166,6 +166,7 @@ export class Turn {
   readonly pendingToolCalls: ToolCallRequestInfo[];
   private debugResponses: GenerateContentResponse[];
   finishReason: FinishReason | undefined;
+  lastResponse: GenerateContentResponse | undefined;
 
   constructor(
     private readonly chat: GeminiChat,
@@ -174,6 +175,7 @@ export class Turn {
     this.pendingToolCalls = [];
     this.debugResponses = [];
     this.finishReason = undefined;
+    this.lastResponse = undefined;
   }
   // The run method yields simpler events suitable for server logic
   async *run(
@@ -198,6 +200,7 @@ export class Turn {
           return;
         }
         this.debugResponses.push(resp);
+        this.lastResponse = resp;
 
         const thoughtPart = resp.candidates?.[0]?.content?.parts?.[0];
         if (thoughtPart?.thought) {

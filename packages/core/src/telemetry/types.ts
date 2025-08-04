@@ -272,13 +272,20 @@ export class NextSpeakerCheckEvent {
   prompt_id: string;
   finish_reason: string;
   result: string;
+  last_chunk?: string;
 
-  constructor(prompt_id: string, finish_reason: string, result: string) {
+  constructor(
+    prompt_id: string,
+    finish_reason: string,
+    result: string,
+    last_chunk?: string,
+  ) {
     this['event.name'] = 'next_speaker_check';
     this['event.timestamp'] = new Date().toISOString();
     this.prompt_id = prompt_id;
     this.finish_reason = finish_reason;
     this.result = result;
+    this.last_chunk = last_chunk;
   }
 }
 
