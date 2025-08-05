@@ -494,7 +494,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const [previousUserInput, setPreviousUserInput] = useState('');
   const handleUserCancel = useCallback(() => {
     buffer.setText(previousUserInput);
-  }, [previousUserInput]);
+  }, [buffer, previousUserInput]);
 
   const {
     streamingState,
