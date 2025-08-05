@@ -6,7 +6,6 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useInput } from 'ink';
-import { TextBuffer } from '../components/shared/text-buffer.js';
 import {
   Config,
   GeminiClient,
