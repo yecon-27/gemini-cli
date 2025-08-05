@@ -44,9 +44,10 @@
     "open": "^10.1.2",
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
-    "strip-ansi": "^7.1.0",
     "undici": "^7.10.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "node-pty": "1.0.0",
+    "@xterm/headless": "5.5.0"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",

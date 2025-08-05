@@ -92,6 +92,8 @@ export interface Tool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
+    terminalColumns?: number,
+    terminalRows?: number,
   ): Promise<TResult>;
 }
 
@@ -195,6 +197,8 @@ export abstract class BaseTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
+    terminalColumns?: number,
+    terminalRows?: number,
   ): Promise<TResult>;
 }
 

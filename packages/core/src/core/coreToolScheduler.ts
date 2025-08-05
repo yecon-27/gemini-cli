@@ -224,6 +224,7 @@ interface CoreToolSchedulerOptions {
   onToolCallsUpdate?: ToolCallsUpdateHandler;
   getPreferredEditor: () => EditorType | undefined;
   config: Config;
+  getTerminalSize: () => { columns: number; rows: number };
 }
 
 export class CoreToolScheduler {
@@ -234,6 +235,7 @@ export class CoreToolScheduler {
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
   private config: Config;
+  private getTerminalSize: () => { columns: number; rows: number };
 
   constructor(options: CoreToolSchedulerOptions) {
     this.config = options.config;
@@ -242,6 +244,7 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
+    this.getTerminalSize = options.getTerminalSize;
   }
 
   private setStatusInternal(
@@ -664,8 +667,15 @@ export class CoreToolScheduler {
               }
             : undefined;
 
+        const terminalSize = this.getTerminalSize();
         scheduledCall.tool
-          .execute(scheduledCall.request.args, signal, liveOutputCallback)
+          .execute(
+            scheduledCall.request.args,
+            signal,
+            liveOutputCallback,
+            terminalSize.columns,
+            terminalSize.rows,
+          )
           .then(async (toolResult: ToolResult) => {
             if (signal.aborted) {
               this.setStatusInternal(

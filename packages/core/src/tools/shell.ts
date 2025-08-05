@@ -178,6 +178,8 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
     params: ShellToolParams,
     signal: AbortSignal,
     updateOutput?: (output: string) => void,
+    terminalColumns?: number,
+    terminalRows?: number,
   ): Promise<ToolResult> {
     const strippedCommand = stripShellWrapper(params.command);
     const validationError = this.validateToolParams({
@@ -220,9 +222,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         params.directory || '',
       );
 
-      let cumulativeStdout = '';
-      let cumulativeStderr = '';
-
+      let cumulativeOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
 
@@ -239,15 +239,9 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
 
           switch (event.type) {
             case 'data':
-              if (isBinaryStream) break; // Don't process text if we are in binary mode
-              if (event.stream === 'stdout') {
-                cumulativeStdout += event.chunk;
-              } else {
-                cumulativeStderr += event.chunk;
-              }
-              currentDisplayOutput =
-                cumulativeStdout +
-                (cumulativeStderr ? `\n${cumulativeStderr}` : '');
+              if (isBinaryStream) break;
+              cumulativeOutput += event.chunk;
+              currentDisplayOutput = cumulativeOutput;
               if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
                 shouldUpdate = true;
               }
@@ -278,6 +272,8 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
           }
         },
         signal,
+        terminalColumns,
+        terminalRows,
       );
 
       const result = await resultPromise;
@@ -309,7 +305,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
       if (result.aborted) {
         llmContent = 'Command was cancelled by user before it could complete.';
         if (result.output.trim()) {
-          llmContent += ` Below is the output (on stdout and stderr) before it was cancelled:\n${result.output}`;
+          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
@@ -323,8 +319,7 @@ export class ShellTool extends BaseTool<ShellToolParams, ToolResult> {
         llmContent = [
           `Command: ${params.command}`,
           `Directory: ${params.directory || '(root)'}`,
-          `Stdout: ${result.stdout || '(empty)'}`,
-          `Stderr: ${result.stderr || '(empty)'}`,
+          `Output: ${result.output || '(empty)'}`,
           `Error: ${finalError}`, // Use the cleaned error string.
           `Exit Code: ${result.exitCode ?? '(none)'}`,
           `Signal: ${result.signal ?? '(none)'}`,
