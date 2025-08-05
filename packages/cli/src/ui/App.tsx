@@ -882,8 +882,8 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
           {shouldShowIdePrompt ? (
             <IdeIntegrationNudge
-              question="Do you want your VS Code editor to be part of Gemini CLI's context?"
-              description="By selecting Yes, a VS Code extension will be installed. Your open files will be added to context and diffs will be opened in your editor."
+              question="Do you want to connect your VS Code editor to Gemini CLI?"
+              description="If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in VS Code."
               onComplete={handleIdePromptComplete}
             />
           ) : shellConfirmationRequest ? (
