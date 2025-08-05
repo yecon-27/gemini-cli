@@ -491,6 +491,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
+  const [previousUserInput, setPreviousUserInput] = useState("");
+  const handleUserCancel = useCallback(() => {
+    buffer.setText(previousUserInput);
+  }, [previousUserInput]);
+
   const {
     streamingState,
     submitQuery,
@@ -510,7 +515,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
-    buffer,
+    handleUserCancel,
   );
 
   // Input handling
@@ -519,6 +524,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
         submitQuery(trimmedValue);
+        setPreviousUserInput(trimmedValue);
       }
     },
     [submitQuery],

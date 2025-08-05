@@ -94,7 +94,7 @@ export const useGeminiStream = (
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
-  buffer: TextBuffer,
+  onCancelSubmit: () => void,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -199,6 +199,8 @@ export const useGeminiStream = (
         },
         Date.now(),
       );
+      setPendingHistoryItem(null);
+      onCancelSubmit();
       setIsResponding(false);
     }
   });
