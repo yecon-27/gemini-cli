@@ -491,7 +491,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
-  const [previousUserInput, setPreviousUserInput] = useState("");
+  const [previousUserInput, setPreviousUserInput] = useState('');
   const handleUserCancel = useCallback(() => {
     buffer.setText(previousUserInput);
   }, [previousUserInput]);
