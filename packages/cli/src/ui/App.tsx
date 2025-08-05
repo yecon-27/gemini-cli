@@ -61,7 +61,6 @@ import {
   AuthType,
   type IdeContext,
   ideContext,
-  detectIde,
   DetectedIde,
 } from '@google/gemini-cli-core';
 import {
@@ -122,11 +121,11 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
   const { history, addItem, clearItems, loadHistory } = useHistory();
 
   const [idePromptAnswered, setIdePromptAnswered] = useState(false);
-  const ide = detectIde();
+  const currentIDE = config.getIdeClient().getCurrentIde();
   const shouldShowIdePrompt =
-    ide === DetectedIde.VSCode &&
-    !config.getIdeMode() &&
     config.getIdeModeFeature() &&
+    currentIDE &&
+    !config.getIdeMode() &&
     !settings.merged.disableIdeIntegrationNudge &&
     !idePromptAnswered;
 

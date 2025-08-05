@@ -84,6 +84,7 @@ interface MockServerConfig {
   getAllGeminiMdFilenames: Mock<() => string[]>;
   getGeminiClient: Mock<() => GeminiClient | undefined>;
   getUserTier: Mock<() => Promise<string | undefined>>;
+  getIdeClient: Mock<() => IdeClient | undefined>;
 }
 
 // Mock @google/gemini-cli-core and its Config class
@@ -154,6 +155,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         getUserTier: vi.fn().mockResolvedValue(undefined),
         getIdeModeFeature: vi.fn(() => false),
         getIdeMode: vi.fn(() => false),
+        getIdeClient: vi.fn().mockReturnValue({
+          getCurrentIde: vi.fn(),
+        }),
         getWorkspaceContext: vi.fn(() => ({
           getDirectories: vi.fn(() => []),
         })),
