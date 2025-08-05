@@ -133,7 +133,6 @@ export const ToolConfirmationMessage: React.FC<
       },
     );
 
-    // TODO(chrstnb): support edit tool in IDE mode.
     if (!config?.getIdeMode()) {
       options.push({
         label: 'Modify with external editor',

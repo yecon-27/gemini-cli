@@ -328,6 +328,12 @@ Expectation for required parameters:
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
     );
+    const ideClient = this.config.getIdeClient();
+    const ideConfirmation =
+      this.config.getIdeMode() && ideClient
+        ? ideClient.openDiff(params.file_path, editData.newContent)
+        : undefined;
+
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
       title: `Confirm Edit: ${shortenPath(makeRelative(params.file_path, this.config.getTargetDir()))}`,
@@ -340,7 +346,16 @@ Expectation for required parameters:
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           this.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
         }
+
+        if (ideConfirmation) {
+          const result = await ideConfirmation;
+          if (result.status === 'accepted' && result.content) {
+            params.old_string = editData.currentContent ?? '';
+            params.new_string = result.content;
+          }
+        }
       },
+      ideConfirmation,
     };
     return confirmationDetails;
   }
