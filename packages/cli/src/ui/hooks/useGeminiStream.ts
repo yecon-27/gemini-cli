@@ -6,6 +6,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useInput } from 'ink';
+import { TextBuffer } from '../components/shared/text-buffer.js';
 import {
   Config,
   GeminiClient,
@@ -93,6 +94,7 @@ export const useGeminiStream = (
   performMemoryRefresh: () => Promise<void>,
   modelSwitchedFromQuotaError: boolean,
   setModelSwitchedFromQuotaError: React.Dispatch<React.SetStateAction<boolean>>,
+  buffer: TextBuffer,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -197,7 +199,6 @@ export const useGeminiStream = (
         },
         Date.now(),
       );
-      setPendingHistoryItem(null);
       setIsResponding(false);
     }
   });

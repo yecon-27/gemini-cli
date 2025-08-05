@@ -482,6 +482,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     setIsProcessing,
   );
 
+  const buffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 10, width: inputWidth },
+    stdin,
+    setRawMode,
+    isValidPath,
+    shellModeActive,
+  });
+
   const {
     streamingState,
     submitQuery,
@@ -501,6 +510,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     performMemoryRefresh,
     modelSwitchedFromQuotaError,
     setModelSwitchedFromQuotaError,
+    buffer,
   );
 
   // Input handling
@@ -513,15 +523,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     },
     [submitQuery],
   );
-
-  const buffer = useTextBuffer({
-    initialText: '',
-    viewport: { height: 10, width: inputWidth },
-    stdin,
-    setRawMode,
-    isValidPath,
-    shellModeActive,
-  });
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
   const pendingHistoryItems = [...pendingSlashCommandHistoryItems];
