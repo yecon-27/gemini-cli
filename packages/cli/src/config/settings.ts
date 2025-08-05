@@ -115,6 +115,9 @@ export interface Settings {
   /// IDE mode setting configured via slash command toggle.
   ideMode?: boolean;
 
+  // Setting to prompt the user to enable IDE integration.
+  disableIdeIntegrationNudge?: boolean;
+
   // Setting for disabling auto-update.
   disableAutoUpdate?: boolean;
 

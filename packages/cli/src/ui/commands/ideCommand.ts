@@ -110,6 +110,10 @@ export const ideCommand = (config: Config | null): SlashCommand | null => {
       );
 
       const result = await installer.install();
+      if (result.success) {
+        config.setIdeMode(true);
+        context.services.settings.setValue(SettingScope.User, 'ideMode', true);
+      }
       context.ui.addItem(
         {
           type: result.success ? 'info' : 'error',
