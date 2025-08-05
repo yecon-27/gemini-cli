@@ -61,7 +61,6 @@ import {
   AuthType,
   type IdeContext,
   ideContext,
-  DetectedIde,
 } from '@google/gemini-cli-core';
 import {
   IdeIntegrationNudge,
@@ -126,7 +125,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     config.getIdeModeFeature() &&
     currentIDE &&
     !config.getIdeMode() &&
-    !settings.merged.disableIdeIntegrationNudge &&
+    !settings.merged.hasSeenIdeIntegrationNudge &&
     !idePromptAnswered;
 
   useEffect(() => {
@@ -534,14 +533,14 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
         handleSlashCommand('/ide install');
         settings.setValue(
           SettingScope.User,
-          'disableIdeIntegrationNudge',
-          false,
+          'hasSeenIdeIntegrationNudge',
+          true,
         );
       } else if (result === 'dismiss') {
         settings.setValue(
           SettingScope.User,
-          'disableIdeIntegrationNudge',
-          false,
+          'hasSeenIdeIntegrationNudge',
+          true,
         );
       }
       setIdePromptAnswered(true);
