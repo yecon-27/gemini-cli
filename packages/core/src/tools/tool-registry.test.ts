@@ -30,6 +30,10 @@ import {
   Schema,
 } from '@google/genai';
 import { spawn } from 'node:child_process';
+import { IdeClient } from '../ide/ide-client.js';
+import fs from 'node:fs';
+
+vi.mock('node:fs');
 
 // Use vi.hoisted to define the mock function so it can be used in the vi.mock factory
 const mockDiscoverMcpTools = vi.hoisted(() => vi.fn());
@@ -136,6 +140,7 @@ const baseConfigParams: ConfigParameters = {
   geminiMdFileCount: 0,
   approvalMode: ApprovalMode.DEFAULT,
   sessionId: 'test-session-id',
+  ideClient: IdeClient.getInstance(false),
 };
 
 describe('ToolRegistry', () => {
@@ -144,6 +149,10 @@ describe('ToolRegistry', () => {
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isDirectory: () => true,
+    } as fs.Stats);
     config = new Config(baseConfigParams);
     toolRegistry = new ToolRegistry(config);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -210,35 +219,31 @@ describe('ToolRegistry', () => {
       const mcpTool1_c = new DiscoveredMCPTool(
         mockCallable,
         server1Name,
-        `${server1Name}__zebra-tool`,
+        'zebra-tool',
         'd1',
         {},
-        'zebra-tool',
       );
       const mcpTool1_a = new DiscoveredMCPTool(
         mockCallable,
         server1Name,
-        `${server1Name}__apple-tool`,
+        'apple-tool',
         'd2',
         {},
-        'apple-tool',
       );
       const mcpTool1_b = new DiscoveredMCPTool(
         mockCallable,
         server1Name,
-        `${server1Name}__banana-tool`,
+        'banana-tool',
         'd3',
         {},
-        'banana-tool',
       );
 
       const mcpTool2 = new DiscoveredMCPTool(
         mockCallable,
         server2Name,
-        'server2Name__tool-on-server2',
+        'tool-on-server2',
         'd4',
         {},
-        'tool-on-server2',
       );
       const nonMcpTool = new MockTool('regular-tool');
 
@@ -253,11 +258,7 @@ describe('ToolRegistry', () => {
 
       // Assert that the array has the correct tools and is sorted by name
       expect(toolsFromServer1).toHaveLength(3);
-      expect(toolNames).toEqual([
-        `${server1Name}__apple-tool`,
-        `${server1Name}__banana-tool`,
-        `${server1Name}__zebra-tool`,
-      ]);
+      expect(toolNames).toEqual(['apple-tool', 'banana-tool', 'zebra-tool']);
 
       // Assert that all returned tools are indeed from the correct server
       for (const tool of toolsFromServer1) {
@@ -320,7 +321,7 @@ describe('ToolRegistry', () => {
         return mockChildProcess as any;
       });
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       const discoveredTool = toolRegistry.getTool('tool-with-bad-format');
       expect(discoveredTool).toBeDefined();
@@ -346,12 +347,13 @@ describe('ToolRegistry', () => {
       };
       vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        undefined,
         false,
       );
     });
@@ -368,12 +370,13 @@ describe('ToolRegistry', () => {
       };
       vi.spyOn(config, 'getMcpServers').mockReturnValue(mcpServerConfigVal);
 
-      await toolRegistry.discoverTools();
+      await toolRegistry.discoverAllTools();
 
       expect(mockDiscoverMcpTools).toHaveBeenCalledWith(
         mcpServerConfigVal,
         undefined,
         toolRegistry,
+        undefined,
         false,
       );
     });
