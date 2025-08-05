@@ -491,10 +491,15 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
     shellModeActive,
   });
 
-  const [previousUserInput, setPreviousUserInput] = useState('');
   const handleUserCancel = useCallback(() => {
-    buffer.setText(previousUserInput);
-  }, [buffer, previousUserInput]);
+    const lastUserItem = history
+      .slice()
+      .reverse()
+      .find((item) => item.type === 'user');
+    if (lastUserItem && typeof lastUserItem.text === 'string') {
+      buffer.setText(lastUserItem.text);
+    }
+  }, [buffer, history]);
 
   const {
     streamingState,
@@ -524,7 +529,6 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
       const trimmedValue = submittedValue.trim();
       if (trimmedValue.length > 0) {
         submitQuery(trimmedValue);
-        setPreviousUserInput(trimmedValue);
       }
     },
     [submitQuery],
