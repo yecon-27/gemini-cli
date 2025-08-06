@@ -156,7 +156,8 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
 
   // If we're already at the end of a word (including punctuation sequences), advance to next word
   // This includes both regular word endings and script boundaries
-  const atEndOfWordChar = i < chars.length &&
+  const atEndOfWordChar =
+    i < chars.length &&
     isWordCharWithCombining(chars[i]) &&
     (i + 1 >= chars.length ||
       !isWordCharWithCombining(chars[i + 1]) ||
@@ -164,10 +165,14 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
         i + 1 < chars.length &&
         isWordCharStrict(chars[i + 1]) &&
         isDifferentScript(chars[i], chars[i + 1])));
-  
-  const atEndOfPunctuation = i < chars.length &&
-    !isWordCharWithCombining(chars[i]) && !isWhitespace(chars[i]) &&
-    (i + 1 >= chars.length || isWhitespace(chars[i + 1]) || isWordCharWithCombining(chars[i + 1]));
+
+  const atEndOfPunctuation =
+    i < chars.length &&
+    !isWordCharWithCombining(chars[i]) &&
+    !isWhitespace(chars[i]) &&
+    (i + 1 >= chars.length ||
+      isWhitespace(chars[i + 1]) ||
+      isWordCharWithCombining(chars[i + 1]));
 
   if (atEndOfWordChar || atEndOfPunctuation) {
     // We're at the end of a word or punctuation sequence, move forward to find next word
@@ -217,7 +222,11 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
     }
   } else if (i < chars.length && !isWhitespace(chars[i])) {
     // Handle punctuation sequences (like ████)
-    while (i < chars.length && !isWordCharStrict(chars[i]) && !isWhitespace(chars[i])) {
+    while (
+      i < chars.length &&
+      !isWordCharStrict(chars[i]) &&
+      !isWhitespace(chars[i])
+    ) {
       foundWord = true;
       lastBaseCharPos = i;
       i++;

@@ -1011,7 +1011,7 @@ describe('vim-buffer-actions', () => {
 
       it('should handle Unicode block characters consistently with w and e commands', () => {
         const state = createTestState(['██ █████ ██'], 0, 0);
-        
+
         // Test w command progression
         let wResult = handleVimAction(state, {
           type: 'vim_move_word_forward' as const,
@@ -1019,14 +1019,14 @@ describe('vim-buffer-actions', () => {
         });
         expect(wResult).toHaveOnlyValidCharacters();
         expect(wResult.cursorCol).toBe(3); // Start of second block sequence
-        
+
         wResult = handleVimAction(wResult, {
           type: 'vim_move_word_forward' as const,
           payload: { count: 1 },
         });
         expect(wResult).toHaveOnlyValidCharacters();
         expect(wResult.cursorCol).toBe(9); // Start of third block sequence
-        
+
         // Test e command progression from beginning
         let eResult = handleVimAction(state, {
           type: 'vim_move_word_end' as const,
@@ -1034,14 +1034,14 @@ describe('vim-buffer-actions', () => {
         });
         expect(eResult).toHaveOnlyValidCharacters();
         expect(eResult.cursorCol).toBe(1); // End of first block sequence
-        
+
         eResult = handleVimAction(eResult, {
           type: 'vim_move_word_end' as const,
           payload: { count: 1 },
         });
         expect(eResult).toHaveOnlyValidCharacters();
         expect(eResult.cursorCol).toBe(7); // End of second block sequence
-        
+
         eResult = handleVimAction(eResult, {
           type: 'vim_move_word_end' as const,
           payload: { count: 1 },
