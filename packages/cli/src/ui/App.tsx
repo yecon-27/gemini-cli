@@ -89,6 +89,7 @@ import { ShowMoreLines } from './components/ShowMoreLines.js';
 import { PrivacyNotice } from './privacy/PrivacyNotice.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from '../utils/events.js';
+import { NARROW_BREAKPOINT } from './constants.js';
 
 const CTRL_EXIT_PROMPT_DURATION_MS = 1000;
 
@@ -420,15 +421,16 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
   // Terminal and UI setup
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
+  const isNarrow = terminalWidth < NARROW_BREAKPOINT;
   const { stdin, setRawMode } = useStdin();
   const isInitialMount = useRef(true);
 
   const widthFraction = 0.9;
   const inputWidth = Math.max(
     20,
-    Math.floor(terminalWidth * widthFraction) - 3,
+    Math.floor(terminalWidth * widthFraction) - 4,
   );
-  const suggestionsWidth = Math.max(60, Math.floor(terminalWidth * 0.8));
+  const suggestionsWidth = Math.max(20, Math.floor(terminalWidth * 0.9));
 
   // Utility callbacks
   const isValidPath = useCallback((filePath: string): boolean => {
@@ -786,11 +788,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
           items={[
             <Box flexDirection="column" key="header">
               {!settings.merged.hideBanner && (
-                <Header
-                  terminalWidth={terminalWidth}
-                  version={version}
-                  nightly={nightly}
-                />
+                <Header version={version} nightly={nightly} />
               )}
               {!settings.merged.hideTips && <Tips config={config} />}
             </Box>,
@@ -939,9 +937,10 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
 
               <Box
                 marginTop={1}
-                display="flex"
                 justifyContent="space-between"
                 width="100%"
+                flexDirection={isNarrow ? 'column' : 'row'}
+                alignItems={isNarrow ? 'flex-start' : 'center'}
               >
                 <Box>
                   {process.env.GEMINI_SYSTEM_MD && (
@@ -966,7 +965,7 @@ const App = ({ config, settings, startupWarnings = [], version }: AppProps) => {
                     />
                   )}
                 </Box>
-                <Box>
+                <Box paddingTop={isNarrow ? 1 : 0}>
                   {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
                     !shellModeActive && (
                       <AutoAcceptIndicator

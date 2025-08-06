@@ -15,3 +15,5 @@ export const UI_WIDTH =
 export const STREAM_DEBOUNCE_MS = 100;
 
 export const SHELL_COMMAND_NAME = 'Shell Command';
+
+export const NARROW_BREAKPOINT = 80;

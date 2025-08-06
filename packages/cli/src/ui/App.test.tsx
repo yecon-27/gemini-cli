@@ -16,6 +16,7 @@ import {
   SandboxConfig,
   GeminiClient,
   ideContext,
+  AuthType,
 } from '@google/gemini-cli-core';
 import { LoadedSettings, SettingsFile, Settings } from '../config/settings.js';
 import process from 'node:process';
@@ -26,6 +27,7 @@ import { Tips } from './components/Tips.js';
 import { checkForUpdates, UpdateObject } from './utils/updateCheck.js';
 import { EventEmitter } from 'events';
 import { updateEventEmitter } from '../utils/updateEventEmitter.js';
+import * as useTerminalSize from './hooks/useTerminalSize.js';
 import * as auth from '../config/auth.js';
 
 // Define a more complete mock server config based on actual Config
@@ -237,6 +239,10 @@ vi.mock('./config/auth.js', () => ({
   validateAuthMethod: vi.fn(),
 }));
 
+vi.mock('../hooks/useTerminalSize.js', () => ({
+  useTerminalSize: vi.fn(),
+}));
+
 const mockedCheckForUpdates = vi.mocked(checkForUpdates);
 const { isGitRepository: mockedIsGitRepository } = vi.mocked(
   await import('@google/gemini-cli-core'),
@@ -249,7 +255,6 @@ describe('App UI', () => {
   let mockSettings: LoadedSettings;
   let mockVersion: string;
   let currentUnmount: (() => void) | undefined;
-
   const createMockSettings = (
     settings: {
       system?: Partial<Settings>;
@@ -279,6 +284,11 @@ describe('App UI', () => {
 
   beforeEach(() => {
     const ServerConfigMocked = vi.mocked(ServerConfig, true);
+    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+      columns: 120,
+      rows: 24,
+    });
+
     mockConfig = new ServerConfigMocked({
       embeddingModel: 'test-embedding-model',
       sandbox: undefined,
@@ -903,36 +913,76 @@ describe('App UI', () => {
     });
   });
 
-  it('should render the initial UI correctly', () => {
-    const { lastFrame, unmount } = render(
-      <App
-        config={mockConfig as unknown as ServerConfig}
-        settings={mockSettings}
-        version={mockVersion}
-      />,
-    );
-    currentUnmount = unmount;
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('should render correctly with the prompt input box', () => {
-    vi.mocked(useGeminiStream).mockReturnValue({
-      streamingState: StreamingState.Idle,
-      submitQuery: vi.fn(),
-      initError: null,
-      pendingHistoryItems: [],
-      thought: null,
+  describe('UI rendering', () => {
+    it('should render correctly on a wide terminal', () => {
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      expect(lastFrame()).toMatchSnapshot();
     });
 
-    const { lastFrame, unmount } = render(
-      <App
-        config={mockConfig as unknown as ServerConfig}
-        settings={mockSettings}
-        version={mockVersion}
-      />,
-    );
-    currentUnmount = unmount;
-    expect(lastFrame()).toMatchSnapshot();
+    it('should render correctly on a narrow terminal', () => {
+      vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+        columns: 79,
+        rows: 24,
+      });
+
+      const { lastFrame, unmount } = render(
+        <App
+          config={mockConfig as unknown as ServerConfig}
+          settings={mockSettings}
+          version={mockVersion}
+        />,
+      );
+      currentUnmount = unmount;
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
+    describe('with prompt input box', () => {
+      beforeEach(() => {
+        vi.mocked(useGeminiStream).mockReturnValue({
+          streamingState: StreamingState.Idle,
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: null,
+        });
+      });
+
+      it('should render correctly on a wide terminal', () => {
+        const { lastFrame, unmount } = render(
+          <App
+            config={mockConfig as unknown as ServerConfig}
+            settings={mockSettings}
+            version={mockVersion}
+          />,
+        );
+        currentUnmount = unmount;
+        expect(lastFrame()).toMatchSnapshot();
+      });
+
+      it('should render correctly on a narrow terminal', () => {
+        vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
+          columns: 79,
+          rows: 24,
+        });
+
+        const { lastFrame, unmount } = render(
+          <App
+            config={mockConfig as unknown as ServerConfig}
+            settings={mockSettings}
+            version={mockVersion}
+          />,
+        );
+        currentUnmount = unmount;
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
   });
 
   describe('with initial prompt from --prompt-interactive', () => {

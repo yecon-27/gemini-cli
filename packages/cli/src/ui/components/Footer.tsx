@@ -15,6 +15,9 @@ import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 
 import { DebugProfiler } from './DebugProfiler.js';
 
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { NARROW_BREAKPOINT } from '../constants.js';
+
 interface FooterProps {
   model: string;
   targetDir: string;
@@ -44,24 +47,35 @@ export const Footer: React.FC<FooterProps> = ({
   nightly,
   vimMode,
 }) => {
+  const { columns: terminalWidth } = useTerminalSize();
   const limit = tokenLimit(model);
   const percentage = promptTokenCount / limit;
 
+  const isNarrow = terminalWidth < NARROW_BREAKPOINT;
+
+  // Adjust path length based on terminal width
+  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.4));
+
   return (
-    <Box justifyContent="space-between" width="100%">
+    <Box
+      justifyContent="space-between"
+      width="100%"
+      flexDirection={isNarrow ? 'column' : 'row'}
+      alignItems={isNarrow ? 'flex-start' : 'center'}
+    >
       <Box>
         {debugMode && <DebugProfiler />}
         {vimMode && <Text color={Colors.Gray}>[{vimMode}] </Text>}
         {nightly ? (
           <Gradient colors={Colors.GradientColors}>
             <Text>
-              {shortenPath(tildeifyPath(targetDir), 70)}
+              {shortenPath(tildeifyPath(targetDir), pathLength)}
               {branchName && <Text> ({branchName}*)</Text>}
             </Text>
           </Gradient>
         ) : (
           <Text color={Colors.LightBlue}>
-            {shortenPath(tildeifyPath(targetDir), 70)}
+            {shortenPath(tildeifyPath(targetDir), pathLength)}
             {branchName && <Text color={Colors.Gray}> ({branchName}*)</Text>}
           </Text>
         )}
@@ -74,10 +88,12 @@ export const Footer: React.FC<FooterProps> = ({
 
       {/* Middle Section: Centered Sandbox Info */}
       <Box
-        flexGrow={1}
+        flexGrow={isNarrow ? 0 : 1}
         alignItems="center"
-        justifyContent="center"
+        justifyContent={isNarrow ? 'flex-start' : 'center'}
         display="flex"
+        paddingX={isNarrow ? 0 : 1}
+        paddingTop={isNarrow ? 1 : 0}
       >
         {process.env.SANDBOX && process.env.SANDBOX !== 'sandbox-exec' ? (
           <Text color="green">
@@ -96,9 +112,9 @@ export const Footer: React.FC<FooterProps> = ({
       </Box>
 
       {/* Right Section: Gemini Label and Console Summary */}
-      <Box alignItems="center">
+      <Box alignItems="center" paddingTop={isNarrow ? 1 : 0}>
         <Text color={Colors.AccentBlue}>
-          {' '}
+          {isNarrow ? '' : ' '}
           {model}{' '}
           <Text color={Colors.Gray}>
             ({((1 - percentage) * 100).toFixed(0)}% context left)

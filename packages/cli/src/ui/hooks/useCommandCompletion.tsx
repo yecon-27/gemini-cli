@@ -74,6 +74,7 @@ export function useCommandCompletion(
 
   const completionStart = useRef(-1);
   const completionEnd = useRef(-1);
+  const previousCommandPath = useRef<string>('');
 
   const cursorRow = buffer.cursor[0];
   const cursorCol = buffer.cursor[1];
@@ -137,6 +138,13 @@ export function useCommandCompletion(
         partial = rawParts[rawParts.length - 1];
         commandPathParts = rawParts.slice(0, -1);
       }
+
+      const currentCommandPath = commandPathParts.join('/');
+      if (currentCommandPath !== previousCommandPath.current) {
+        setVisibleStartIndex(0);
+        setActiveSuggestionIndex(0);
+      }
+      previousCommandPath.current = currentCommandPath;
 
       // Traverse the Command Tree using the tentative completed path
       let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
