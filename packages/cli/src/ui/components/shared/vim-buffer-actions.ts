@@ -12,11 +12,30 @@ import {
   replaceRangeInternal,
   pushUndo,
   isWordCharStrict,
+  isWordCharWithCombining,
+  isCombiningMark,
   findNextWordAcrossLines,
   findPrevWordAcrossLines,
   findWordEndInLine,
 } from './text-buffer.js';
 import { cpLen, toCodePoints } from '../../utils/textUtils.js';
+
+// Check if we're at the end of a base word (on the last base character)
+// Returns true if current position has a base character followed only by combining marks until non-word
+function isAtEndOfBaseWord(lineCodePoints: string[], col: number): boolean {
+  if (!isWordCharStrict(lineCodePoints[col])) return false;
+
+  // Look ahead to see if we have only combining marks followed by non-word
+  let i = col + 1;
+
+  // Skip any combining marks
+  while (i < lineCodePoints.length && isCombiningMark(lineCodePoints[i])) {
+    i++;
+  }
+
+  // If we hit end of line or non-word character, we were at end of base word
+  return i >= lineCodePoints.length || !isWordCharStrict(lineCodePoints[i]);
+}
 
 export type VimAction = Extract<
   TextBufferAction,
@@ -433,6 +452,16 @@ export function handleVimAction(
           }
         } else if (newCol < lineLength - 1) {
           newCol++;
+
+          // Skip over combining marks - don't let cursor land on them
+          const currentLinePoints = toCodePoints(currentLine);
+          while (
+            newCol < currentLinePoints.length &&
+            isCombiningMark(currentLinePoints[newCol]) &&
+            newCol < lineLength - 1
+          ) {
+            newCol++;
+          }
         } else if (newRow < lines.length - 1) {
           // At end of line - move to beginning of next line
           newRow++;
@@ -543,11 +572,16 @@ export function handleVimAction(
         if (i === 0) {
           const currentLine = lines[row] || '';
           const lineCodePoints = toCodePoints(currentLine);
+
+          // Check if we're at the end of a word (on the last base character)
           const atEndOfWord =
             col < lineCodePoints.length &&
             isWordCharStrict(lineCodePoints[col]) &&
             (col + 1 >= lineCodePoints.length ||
-              !isWordCharStrict(lineCodePoints[col + 1]));
+              !isWordCharWithCombining(lineCodePoints[col + 1]) ||
+              // Or if we're on a base char followed only by combining marks until non-word
+              (isWordCharStrict(lineCodePoints[col]) &&
+                isAtEndOfBaseWord(lineCodePoints, col)));
 
           if (atEndOfWord) {
             // We're already at end of word, find next word end

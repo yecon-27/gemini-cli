@@ -34,9 +34,34 @@ function isWordChar(ch: string | undefined): boolean {
 }
 
 // Helper functions for line-based word navigation
-export const isWordCharStrict = (char: string): boolean => /\w/.test(char);
+export const isWordCharStrict = (char: string): boolean =>
+  /[\w\p{L}\p{N}]/u.test(char);
 
 export const isWhitespace = (char: string): boolean => /\s/.test(char);
+
+// Check if a character is a combining mark (only diacritics for now)
+export const isCombiningMark = (char: string): boolean => /\p{M}/u.test(char);
+
+// Check if a character should be considered part of a word (including combining marks)
+export const isWordCharWithCombining = (char: string): boolean =>
+  isWordCharStrict(char) || isCombiningMark(char);
+
+// Get the script of a character (simplified for common scripts)
+export const getCharScript = (char: string): string => {
+  if (/[\p{Script=Latin}]/u.test(char)) return 'latin'; // All Latin script chars including diacritics
+  if (/[\p{Script=Han}]/u.test(char)) return 'han'; // Chinese
+  if (/[\p{Script=Arabic}]/u.test(char)) return 'arabic';
+  if (/[\p{Script=Hiragana}]/u.test(char)) return 'hiragana';
+  if (/[\p{Script=Katakana}]/u.test(char)) return 'katakana';
+  if (/[\p{Script=Cyrillic}]/u.test(char)) return 'cyrillic';
+  return 'other';
+};
+
+// Check if two characters are from different scripts (indicating word boundary)
+export const isDifferentScript = (char1: string, char2: string): boolean => {
+  if (!isWordCharStrict(char1) || !isWordCharStrict(char2)) return false;
+  return getCharScript(char1) !== getCharScript(char2);
+};
 
 // Find next word start within a line, starting from col
 export const findNextWordStartInLine = (
@@ -52,7 +77,16 @@ export const findNextWordStartInLine = (
 
   // Skip current word/sequence based on character type
   if (isWordCharStrict(currentChar)) {
-    while (i < chars.length && isWordCharStrict(chars[i])) {
+    while (i < chars.length && isWordCharWithCombining(chars[i])) {
+      // Check for script boundary - if next character is from different script, stop here
+      if (
+        i + 1 < chars.length &&
+        isWordCharStrict(chars[i + 1]) &&
+        isDifferentScript(chars[i], chars[i + 1])
+      ) {
+        i++; // Include current character
+        break; // Stop at script boundary
+      }
       i++;
     }
   } else if (!isWhitespace(currentChar)) {
@@ -95,6 +129,14 @@ export const findPrevWordStartInLine = (
   if (isWordCharStrict(chars[i])) {
     // We're in a word, move to its beginning
     while (i >= 0 && isWordCharStrict(chars[i])) {
+      // Check for script boundary - if previous character is from different script, stop here
+      if (
+        i - 1 >= 0 &&
+        isWordCharStrict(chars[i - 1]) &&
+        isDifferentScript(chars[i], chars[i - 1])
+      ) {
+        return i; // Return current position at script boundary
+      }
       i--;
     }
     return i + 1;
@@ -112,34 +154,83 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
   const chars = toCodePoints(line);
   let i = col;
 
-  // If we're already at the end of a word, advance to next word
-  if (
-    i < chars.length &&
-    isWordCharStrict(chars[i]) &&
-    (i + 1 >= chars.length || !isWordCharStrict(chars[i + 1]))
-  ) {
-    // We're at the end of a word, move forward to find next word
+  // If we're already at the end of a word (including punctuation sequences), advance to next word
+  // This includes both regular word endings and script boundaries
+  const atEndOfWordChar = i < chars.length &&
+    isWordCharWithCombining(chars[i]) &&
+    (i + 1 >= chars.length ||
+      !isWordCharWithCombining(chars[i + 1]) ||
+      (isWordCharStrict(chars[i]) &&
+        i + 1 < chars.length &&
+        isWordCharStrict(chars[i + 1]) &&
+        isDifferentScript(chars[i], chars[i + 1])));
+  
+  const atEndOfPunctuation = i < chars.length &&
+    !isWordCharWithCombining(chars[i]) && !isWhitespace(chars[i]) &&
+    (i + 1 >= chars.length || isWhitespace(chars[i + 1]) || isWordCharWithCombining(chars[i + 1]));
+
+  if (atEndOfWordChar || atEndOfPunctuation) {
+    // We're at the end of a word or punctuation sequence, move forward to find next word
     i++;
-    // Skip whitespace/punctuation to find next word
-    while (i < chars.length && !isWordCharStrict(chars[i])) {
+    // Skip whitespace to find next word or punctuation
+    while (i < chars.length && isWhitespace(chars[i])) {
       i++;
     }
   }
 
-  // If we're not on a word character, find the next word
-  if (i < chars.length && !isWordCharStrict(chars[i])) {
-    while (i < chars.length && !isWordCharStrict(chars[i])) {
+  // If we're not on a word character, find the next word or punctuation sequence
+  if (i < chars.length && !isWordCharWithCombining(chars[i])) {
+    // Skip whitespace to find next word or punctuation
+    while (i < chars.length && isWhitespace(chars[i])) {
       i++;
     }
   }
 
-  // Move to end of current word
-  while (i < chars.length && isWordCharStrict(chars[i])) {
-    i++;
+  // Move to end of current word (including combining marks, but stop at script boundaries)
+  let foundWord = false;
+  let lastBaseCharPos = -1;
+
+  if (i < chars.length && isWordCharWithCombining(chars[i])) {
+    // Handle word characters
+    while (i < chars.length && isWordCharWithCombining(chars[i])) {
+      foundWord = true;
+
+      // Track the position of the last base character (not combining mark)
+      if (isWordCharStrict(chars[i])) {
+        lastBaseCharPos = i;
+      }
+
+      // Check if next character is from a different script (word boundary)
+      if (
+        i + 1 < chars.length &&
+        isWordCharStrict(chars[i + 1]) &&
+        isDifferentScript(chars[i], chars[i + 1])
+      ) {
+        i++; // Include current character
+        if (isWordCharStrict(chars[i - 1])) {
+          lastBaseCharPos = i - 1;
+        }
+        break; // Stop at script boundary
+      }
+
+      i++;
+    }
+  } else if (i < chars.length && !isWhitespace(chars[i])) {
+    // Handle punctuation sequences (like ████)
+    while (i < chars.length && !isWordCharStrict(chars[i]) && !isWhitespace(chars[i])) {
+      foundWord = true;
+      lastBaseCharPos = i;
+      i++;
+    }
   }
 
-  // Move back one to be on the last character of the word
-  return i > col ? i - 1 : null;
+  // Only return a position if we actually found a word
+  // Return the position of the last base character, not combining marks
+  if (foundWord && lastBaseCharPos >= col) {
+    return lastBaseCharPos;
+  }
+
+  return null;
 };
 
 // Find next word across lines
